@@ -1,4 +1,3 @@
-// Device ID Management
 function getDeviceId() {
     let deviceId = localStorage.getItem('dps45_device_id');
     if (!deviceId) {
