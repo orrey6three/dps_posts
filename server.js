@@ -13,18 +13,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.FRONTEND_URL 
-    : 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production'
+      ? process.env.FRONTEND_URL
+      : 'http://localhost:3000',
   credentials: true
 }));
+
 app.use(express.json());
 app.use(cookieParser());
-app.use(express.static('public'));
+
+// Указываем абсолютный путь к статике
+const publicPath = path.join(__dirname, 'public');
+app.use(express.static(publicPath));
 
 // API Routes
 app.use('/api', apiRoutes);
@@ -32,25 +35,29 @@ app.use('/admin', adminRoutes);
 
 // Serve admin page
 app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+  res.sendFile(path.join(publicPath, 'admin.html'));
 });
 
-// Serve frontend
+// Serve frontend - ОБЯЗАТЕЛЬНО после всех маршрутов
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(publicPath, 'index.html'));
 });
 
 // Error handling
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Внутренняя ошибка сервера',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 DPS45 server running on port ${PORT}`);
-  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+// Важно для локальной разработки, Vercel это проигнорирует
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+  });
+}
+
 export default app;
