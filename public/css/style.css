@@ -1,0 +1,268 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    overflow: hidden;
+}
+
+/* Map */
+#map {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: 1;
+}
+
+/* Yandex Maps dark theme custom styles */
+.ymaps-2-1-79-ground-pane {
+    filter: brightness(0.8) contrast(1.1);
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: rgba(17, 24, 39, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: opacity 0.3s ease;
+}
+
+.loading-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top-color: #ef4444;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Bottom Sheet */
+.bottom-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: #1f2937;
+    border-radius: 20px 20px 0 0;
+    padding: 20px;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.bottom-sheet.active {
+    transform: translateY(0);
+}
+
+.bottom-sheet-handle {
+    width: 40px;
+    height: 4px;
+    background: #4b5563;
+    border-radius: 2px;
+    margin: 0 auto 16px;
+}
+
+/* Post Details */
+.post-details h2 {
+    color: #f9fafb;
+}
+
+.post-details p {
+    color: #9ca3af;
+}
+
+/* Status Container */
+.status-container {
+    background: #111827;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.status-item:first-child {
+    border-bottom: 1px solid #374151;
+    padding-bottom: 12px;
+    margin-bottom: 8px;
+}
+
+.status-label {
+    color: #9ca3af;
+    font-size: 14px;
+}
+
+.status-time {
+    color: #f9fafb;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.status-time.stale {
+    color: #6b7280;
+}
+
+.status-time.no-data {
+    color: #4b5563;
+    font-style: italic;
+}
+
+/* Button Container */
+.button-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+/* Vote Buttons */
+.vote-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 20px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.vote-button:active {
+    transform: scale(0.95);
+}
+
+.vote-relevant {
+    background: #ef4444;
+    color: white;
+}
+
+.vote-relevant:hover {
+    background: #dc2626;
+}
+
+.vote-irrelevant {
+    background: #4b5563;
+    color: white;
+}
+
+.vote-irrelevant:hover {
+    background: #374151;
+}
+
+.vote-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Vote Message */
+.vote-message {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+    display: none;
+}
+
+.vote-message.success {
+    display: block;
+    background: #065f46;
+    color: #d1fae5;
+}
+
+.vote-message.error {
+    display: block;
+    background: #7f1d1d;
+    color: #fecaca;
+}
+
+.vote-message.warning {
+    display: block;
+    background: #78350f;
+    color: #fef3c7;
+}
+
+/* Admin Button */
+.admin-button {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background: #1f2937;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 999;
+    color: white;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.admin-button:hover {
+    background: #374151;
+    transform: scale(1.05);
+}
+
+.admin-button:active {
+    transform: scale(0.95);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .bottom-sheet {
+        max-height: 80vh;
+    }
+    
+    .vote-button {
+        padding: 14px 16px;
+        font-size: 15px;
+    }
+    
+    .admin-button {
+        top: 16px;
+        right: 16px;
+        width: 45px;
+        height: 45px;
+    }
+}
+
+/* Smooth Scrolling */
+.bottom-sheet {
+    -webkit-overflow-scrolling: touch;
+}
