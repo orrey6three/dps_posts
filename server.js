@@ -6,7 +6,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import apiRoutes from './routes/api.js';
 import adminRoutes from './routes/admin.js';
-import './tailwind.css';
 
 dotenv.config();
 
@@ -50,9 +49,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-// app.listen(PORT, () => {
-//   console.log(`🚀 DPS45 server running on port ${PORT}`);
-//   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-// });
-
+app.listen(PORT, () => {
+  console.log(`🚀 DPS45 server running on port ${PORT}`);
+  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+});
 export default app;
