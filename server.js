@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import apiRoutes from './routes/api.js';
 import adminRoutes from './routes/admin.js';
+import './tailwind.css';
 
 dotenv.config();
 
