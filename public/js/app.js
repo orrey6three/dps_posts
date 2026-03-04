@@ -73,14 +73,23 @@ class DPSMap {
     initMap() {
         // Wait for Yandex Maps API to load
         ymaps.ready(() => {
-            // Initialize map centered on Shumikha, Kurgan Oblast
+            const KURGAN_LIMITS = [
+                [54.10, 61.30], // Юго-запад (нижний левый угол)
+                [56.80, 68.80]  // Северо-восток (верхний правый угол)
+            ];
             this.map = new ymaps.Map('map', {
                 center: [55.2317, 63.2892],
                 zoom: 13,
                 controls: ['zoomControl', 'geolocationControl']
             }, {
                 searchControlProvider: 'yandex#search',
-                suppressMapOpenBlock: true
+                suppressMapOpenBlock: true,
+
+                restrictMapArea: KURGAN_LIMITS,
+
+                // Ограничиваем зум, чтобы не "улетали" слишком далеко в космос
+                minZoom: 7,
+                maxZoom: 18
             });
             
             // Render markers
