@@ -69,42 +69,39 @@ class DPSMap {
             this.hideLoading();
         }
     }
-    
+
     initMap() {
         // Wait for Yandex Maps API to load
         ymaps.ready(() => {
-            const KURGAN_LIMITS = [
-                [54.10, 61.30], // Юго-запад (нижний левый угол)
-                [56.80, 68.80]  // Северо-восток (верхний правый угол)
+            const SHUMIKHA_LIMITS = [
+                [54.85, 62.80], // Юго-запад (примерно район д. Куликово / Малое Дюрягино)
+                [55.45, 63.80]  // Северо-восток (за Шумихой в сторону Мишкино)
             ];
+
             this.map = new ymaps.Map('map', {
-                center: [55.2317, 63.2892],
-                zoom: 13,
+                center: [55.2255, 63.2982],
+                zoom: 12,
                 controls: ['zoomControl', 'geolocationControl']
             }, {
                 searchControlProvider: 'yandex#search',
                 suppressMapOpenBlock: true,
 
-                restrictMapArea: KURGAN_LIMITS,
+                // Устанавливаем ограничение области
+                restrictMapArea: SHUMIKHA_LIMITS,
 
-                // Ограничиваем зум, чтобы не "улетали" слишком далеко в космос
-                minZoom: 7,
+                minZoom: 10,
                 maxZoom: 18
             });
-            //s
-            // Render markers
+
             this.renderMarkers();
-            
-            // Hide loading
             this.hideLoading();
-            
-            // Close bottom sheet on map click
+
             this.map.events.add('click', () => {
                 document.getElementById('bottom-sheet').classList.remove('active');
             });
         });
     }
-    
+
     renderMarkers() {
         // Clear existing markers
         Object.values(this.markers).forEach(marker => {
