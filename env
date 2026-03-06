@@ -8,4 +8,4 @@ JWT_SECRET=your-jwt-secret-key-here
 # Server
 PORT=3000
 NODE_ENV=production
-
+YANDEX_MAPS_API_KEY=твой_ключ

@@ -180,11 +180,11 @@ class DPSMap {
     
     getIconColor(markerClass) {
         if (markerClass === 'marker-relevant') {
-            return '#ef4444';
+            return '#f43f5e';
         } else if (markerClass === 'marker-irrelevant') {
-            return '#6b7280';
+            return '#64748b';
         } else {
-            return '#4b5563';
+            return '#475569';
         }
     }
     
