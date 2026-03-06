@@ -145,8 +145,8 @@ router.delete('/posts/:id', requireAuth, async (req, res) => {
     console.error('Error deleting post:', error);
     res.status(500).json({ error: 'Не удалось удалить пост' });
   }
-});
 
+});
 /**
  * GET /admin/posts/:id/stats
  * Get detailed stats for a post
