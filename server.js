@@ -43,10 +43,18 @@ app.get('/admin', (req, res) => {
 
 // Serve frontend - ОБЯЗАТЕЛЬНО после всех маршрутов
 app.get('*', (req, res) => {
-  res.sendFile(path.join(publicPath, 'index.html'));
+  const indexPath = path.join(publicPath, 'index.html');
+  
+  fs.readFile(indexPath, 'utf8', (err, data) => {
+    if (err) {
+      return res.status(500).send('Ошибка загрузки index.html');
+    }
+    const result = data.replace('%YANDEX_KEY%', process.env.YANDEX_MAPS_API_KEY || '');
+    
+    res.send(result);
+  });
 });
 
-// Error handling
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
