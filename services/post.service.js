@@ -5,6 +5,9 @@ class PostService {
    * Get all posts with vote statistics
    */
   async getPostsWithStats() {
+    // Auto-delete posts older than 1 hour before fetching
+    await this.cleanupOldPosts();
+
     const { data, error } = await supabase.rpc('get_post_stats');
     
     if (error) {
@@ -13,6 +16,23 @@ class PostService {
     }
     
     return data;
+  }
+
+  /**
+   * Delete posts older than 1 hour
+   */
+  async cleanupOldPosts() {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    
+    const { error } = await supabaseAdmin
+        .from('posts')
+        .delete()
+        .lt('created_at', oneHourAgo);
+
+    if (error) {
+      console.error('Error cleaning up old posts:', error);
+      // We don't throw here to avoid breaking the main fetch if cleanup fails
+    }
   }
 
   /**

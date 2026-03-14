@@ -34,6 +34,20 @@ function formatTimeAgo(timestamp) {
     return `${diffDays} дн. назад`;
 }
 
+function formatYekaterinburgTime(timestamp) {
+    if (!timestamp) return '—';
+    const date = new Date(timestamp);
+    
+    // Yekaterinburg is UTC+5. 
+    // We use Intl.DateTimeFormat for reliable timezone formatting
+    return new Intl.DateTimeFormat('ru-RU', {
+        timeZone: 'Asia/Yekaterinburg',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).format(date);
+}
+
 function isStale(timestamp) {
     if (!timestamp) return true;
     const now = Date.now();
@@ -576,15 +590,32 @@ class DPSMap {
     }
 
     updateBottomSheetTimes(post) {
-        // Update usernames (Creator and Last Voter)
+        // Update Creator
         const authorName = document.getElementById('post-author-name');
-        const lastVoterName = document.getElementById('post-last-voter-name');
-        
         if (authorName) authorName.textContent = post.username || 'Аноним';
-        if (lastVoterName) lastVoterName.textContent = post.last_voter_username || '—';
+
+        // Update Creation Time (GMT+5)
+        const createdAt = document.getElementById('post-created-at');
+        if (createdAt) createdAt.textContent = formatYekaterinburgTime(post.created_at);
+
+        // Update Last Voter info
+        const lastVoterName = document.getElementById('post-last-voter-name');
+        const lastVoteType = document.getElementById('post-last-vote-type');
+        const lastVoteRow = document.getElementById('last-vote-row');
+        
+        if (post.last_voter_username) {
+            if (lastVoterName) lastVoterName.textContent = post.last_voter_username;
+            if (lastVoteType) {
+                const isRelevant = post.last_vote_type === 'relevant';
+                lastVoteType.textContent = isRelevant ? 'Актуально' : 'Не актуально';
+                lastVoteType.style.color = isRelevant ? 'var(--success)' : 'var(--danger)';
+            }
+            if (lastVoteRow) lastVoteRow.style.display = 'flex';
+        } else {
+            if (lastVoteRow) lastVoteRow.style.display = 'none';
+        }
 
         const relevantTime = document.getElementById('relevant-time');
-        // const irrelevantTime = document.getElementById('irrelevant-time');
         
         if (relevantTime) {
             relevantTime.textContent = formatTimeAgo(post.last_relevant);

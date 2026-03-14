@@ -37,8 +37,16 @@
         <div class="bottom-sheet-handle"></div>
         <div id="post-details" class="post-details">
             <div class="author-voter-info">
-                <div>Создатель: <span id="post-author-name">@username</span></div>
-                <div>Последний голос от: <span id="post-last-voter-name">—</span></div>
+                <div class="info-row">
+                    <span class="info-label">Создано:</span>
+                    <span id="post-created-at" class="info-value">—</span>
+                    <span class="info-sub">@<span id="post-author-name">username</span></span>
+                </div>
+                <div class="info-row" id="last-vote-row">
+                    <span class="info-label">Последний голос:</span>
+                    <span id="post-last-vote-type" class="info-value">—</span>
+                    <span class="info-sub">от <span id="post-last-voter-name">—</span></span>
+                </div>
             </div>
             <div class="post-header">
                 <div class="post-type-badge type-dps" id="post-type-badge">ДПС</div>
