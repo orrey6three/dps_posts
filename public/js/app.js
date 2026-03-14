@@ -322,6 +322,14 @@ class DPSMap {
             document.getElementById('settings-drawer').classList.add('active');
         });
 
+        document.getElementById('nav-community').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.closeAllDrawers();
+            document.getElementById('nav-community').classList.add('active');
+            overlay.classList.add('active');
+            document.getElementById('community-drawer').classList.add('active');
+        });
+
         // Drawer Close Buttons
         document.querySelectorAll('.drawer-close').forEach(btn => {
             btn.addEventListener('click', () => this.closeAllDrawers());

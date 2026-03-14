@@ -16,6 +16,16 @@
 </head>
 <body>
     <div id="map"></div>
+    <div class="map-atmosphere" aria-hidden="true"></div>
+    <div class="map-brand" aria-hidden="true">
+        <div class="brand-pill">
+            <span class="brand-dot"></span>
+            <span class="brand-title">DPS45</span>
+            <span class="brand-divider"></span>
+            <span class="brand-tag">Live карта</span>
+        </div>
+        <div class="brand-subtitle">Народная карта постов ДПС</div>
+    </div>
     <a href="/admin" class="admin-map-btn" id="admin-map-btn" title="Админ панель">
         <i class="fa-solid fa-shield-halved"></i> Админ
     </a>
@@ -207,6 +217,62 @@
         </div>
     </div>
 
+    <div id="community-drawer" class="drawer-modal">
+        <div class="drawer-header">
+            <button class="drawer-close" id="btn-close-community">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <h2>Где общаемся</h2>
+        </div>
+        <div class="drawer-content">
+            <div class="community-intro">
+                Мы на связи тут — заходите общаться, задавать вопросы и помогать друг другу.
+            </div>
+            <div class="community-list">
+                <a class="community-item" href="https://t.me/poputishumikha" target="_blank" rel="noopener">
+                    <div class="community-icon telegram"><i class="fa-brands fa-telegram"></i></div>
+                    <div class="community-info">
+                        <div class="community-title">Попути Шумиха</div>
+                        <div class="community-sub">Основной чат</div>
+                    </div>
+                    <i class="fa-solid fa-arrow-up-right-from-square community-arrow"></i>
+                </a>
+                <a class="community-item" href="https://t.me/poputibaraholkashumiha" target="_blank" rel="noopener">
+                    <div class="community-icon telegram"><i class="fa-brands fa-telegram"></i></div>
+                    <div class="community-info">
+                        <div class="community-title">Барахолка</div>
+                        <div class="community-sub">Покупка и продажа</div>
+                    </div>
+                    <i class="fa-solid fa-arrow-up-right-from-square community-arrow"></i>
+                </a>
+                <a class="community-item" href="https://t.me/poputiboltalkaznakomstvashumiha" target="_blank" rel="noopener">
+                    <div class="community-icon telegram"><i class="fa-brands fa-telegram"></i></div>
+                    <div class="community-info">
+                        <div class="community-title">Болталка и знакомства</div>
+                        <div class="community-sub">Свободное общение</div>
+                    </div>
+                    <i class="fa-solid fa-arrow-up-right-from-square community-arrow"></i>
+                </a>
+                <a class="community-item" href="https://max.ru/join/ShSh5UaeEe4mJ_cZIGDVxlIyu6ZxdxBDaxizzErU5MI" target="_blank" rel="noopener">
+                    <div class="community-icon max"><span>MX</span></div>
+                    <div class="community-info">
+                        <div class="community-title">Макс</div>
+                        <div class="community-sub">Новый канал</div>
+                    </div>
+                    <i class="fa-solid fa-arrow-up-right-from-square community-arrow"></i>
+                </a>
+                <a class="community-item" href="https://vk.me/join/N_VdBTD_ZEZHaXdSDFWno18RCXYXk/fU0To=" target="_blank" rel="noopener">
+                    <div class="community-icon vk"><i class="fa-brands fa-vk"></i></div>
+                    <div class="community-info">
+                        <div class="community-title">ВКонтакте</div>
+                        <div class="community-sub">Группа и чаты</div>
+                    </div>
+                    <i class="fa-solid fa-arrow-up-right-from-square community-arrow"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
     <nav class="bottom-nav">
         <a href="#" class="nav-item active" id="nav-map">
             <i class="fa-solid fa-map-location-dot"></i>
@@ -220,6 +286,10 @@
         <a href="#" class="nav-item" id="nav-settings">
             <i class="fa-solid fa-gear"></i>
             <span>Настройки</span>
+        </a>
+        <a href="#" class="nav-item" id="nav-community">
+            <i class="fa-solid fa-comments"></i>
+            <span>Сообщества</span>
         </a>
     </nav>
     <div id="toast-container" class="toast-container"></div>
