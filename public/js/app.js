@@ -702,7 +702,8 @@ class DPSMap {
                 return;
             }
 
-            const emojiStr = this.getEmojiByType(post.type);
+            const isPoPuti = post.comment && post.comment.toLowerCase().includes('попути');
+            const emojiStr = isPoPuti ? '❤️' : this.getEmojiByType(post.type);
             
             let tagStr = post.tags && post.tags.length > 0 ? `<br><em>${post.tags.map(t => '#'+t).join(' ')}</em>` : '';
 
@@ -712,16 +713,19 @@ class DPSMap {
             const isFresh = (timeRelevant > timeIrrelevant) && !isCurrentlyStale;
             
             // If stale or marked irrelevant, make it gray and semi-transparent. If fresh, make it bright.
-            const filterStyle = isFresh 
+            // Po puti markers are ALWAYS bright and pulsing
+            const filterStyle = isPoPuti ? 'none' : (isFresh 
                 ? 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' 
-                : 'grayscale(100%) opacity(0.4)';
+                : 'grayscale(100%) opacity(0.4)');
+
+            const markerClass = isPoPuti ? 'marker-heart' : '';
 
             const sizeValue = this.markerSize;
             const halfSize = sizeValue / 2;
 
             // Create a custom HTML layout for the marker
             const CustomIconLayout = ymaps.templateLayoutFactory.createClass(
-                `<div style="font-size: ${sizeValue}px; line-height: ${sizeValue}px; transform: translate(-50%, -50%); cursor: pointer; filter: ${filterStyle}; transition: all 0.3s ease;">
+                `<div class="${markerClass}" style="font-size: ${sizeValue}px; line-height: ${sizeValue}px; transform: translate(-50%, -50%); cursor: pointer; filter: ${filterStyle}; transition: all 0.3s ease;">
                     ${emojiStr}
                 </div>`
             );
@@ -748,8 +752,17 @@ class DPSMap {
 
             placemark.events.add('click', (e) => {
                 e.preventDefault();
-                e.stopPropagation(); // Stop event from reaching map
-                // Map automatically centers so bottom sheet logic happens next
+                e.stopPropagation(); 
+                
+                if (isPoPuti) {
+                    confetti({
+                        particleCount: 150,
+                        spread: 70,
+                        origin: { y: 0.6 },
+                        colors: ['#ff416c', '#ff4b2b', '#ffffff']
+                    });
+                }
+
                 this.showPostDetails(post);
             });
 
@@ -819,6 +832,18 @@ class DPSMap {
         const message = document.getElementById('vote-message');
         message.className = 'vote-message';
         message.style.display = 'none';
+
+        // Po puti Badge injection
+        const sheet = document.getElementById('bottom-sheet');
+        const existingBadge = sheet.querySelector('.kindness-badge');
+        if (existingBadge) existingBadge.remove();
+
+        if (post.comment && post.comment.toLowerCase().includes('попути')) {
+            const badge = document.createElement('div');
+            badge.className = 'kindness-badge';
+            badge.innerHTML = '<i class="fa-solid fa-hand-holding-heart"></i> Спасибо за добро! Вместе веселее с Попути ❤️';
+            sheet.querySelector('.post-details').appendChild(badge);
+        }
 
         // Open Bottom Sheet visually
         document.getElementById('bottom-sheet').classList.add('active');

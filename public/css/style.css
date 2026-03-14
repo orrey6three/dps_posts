@@ -742,14 +742,15 @@ body {
 .settings-item {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 16px;
+    gap: 12px;
+    padding: 12px 14px;
     background: var(--bg-elevated);
     border-radius: var(--radius-lg);
     text-decoration: none;
     color: var(--text-primary);
     font-weight: 500;
     cursor: pointer;
+    min-height: 56px;
 }
 
 .settings-icon {
@@ -835,7 +836,7 @@ body {
 
 .theme-status-tag {
     margin-left: auto;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 700;
     padding: 4px 10px;
     border-radius: var(--radius-full);
@@ -844,6 +845,10 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.05em;
     transition: all var(--transition-fast);
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 [data-theme="dark"] .theme-status-tag {
@@ -1120,12 +1125,12 @@ body {
 
 .city-nav-btn {
     flex: 1;
-    padding: 8px 4px;
+    padding: 8px 2px;
     background: transparent;
     border: none;
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
