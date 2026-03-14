@@ -74,7 +74,14 @@ class AuthService {
     if (username === 'admin') {
       const isValidAdmin = await this.verifyAdminPassword(password);
       if (isValidAdmin) {
-        return { user: { id: 'admin', username: 'admin', role: 'admin' } };
+        const { data: adminUser } = await supabaseAdmin
+          .from('users')
+          .select('id, username, role')
+          .eq('username', 'admin')
+          .single();
+        
+        if (adminUser) return { user: adminUser };
+        return { user: { id: '00000000-0000-0000-0000-000000000000', username: 'admin', role: 'admin' } };
       }
     }
 

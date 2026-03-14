@@ -7,7 +7,8 @@
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+    <!-- Yandex Maps: REPLACE 'YOUR_API_KEY' with a real key for Geocoding to work -->
+    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=bc901a5b-648b-402f-870a-4a377b21fe44" type="text/javascript"></script>
 </head>
 <body>
 
@@ -43,6 +44,10 @@
                 </div>
             </div>
             <div class="admin-header-actions">
+                <button id="admin-theme-toggle" class="header-btn" title="Сменить тему">
+                    <i class="fa-solid fa-moon moon-icon"></i>
+                    <i class="fa-solid fa-sun sun-icon" style="display:none;"></i>
+                </button>
                 <a href="/" class="header-btn"><i class="fa-solid fa-map-location-dot"></i> Карта</a>
                 <button id="logout-btn" class="header-btn danger"><i class="fa-solid fa-arrow-right-from-bracket"></i> Выйти</button>
             </div>

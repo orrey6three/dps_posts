@@ -69,12 +69,20 @@ class DPSMap {
         this.currentUser = null;
         this.newMarkerCoords = null;
         this.selectedTags = [];
+        this.isPlacementMode = false;
+        this.markerSize = parseInt(localStorage.getItem('dps45_marker_size')) || 32;
+        this.CITY_COORDS = {
+            shchuchye: [55.2133, 62.7634],
+            shumikha: [55.2255, 63.2982],
+            mishkino: [55.3385, 63.9168]
+        };
 
         this.init();
     }
 
     async init() {
         this.initTheme();
+        this.initMarkerSize();
         await this.checkAuth();
         this.initUI();
         await this.loadPosts();
@@ -83,15 +91,132 @@ class DPSMap {
     }
     
     initTheme() {
-        const savedTheme = localStorage.getItem('dps45_theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', savedTheme);
+        const savedTheme = localStorage.getItem('dps45_theme') || 'light';
+        this.applyTheme(savedTheme);
         
         document.getElementById('theme-toggle')?.addEventListener('click', () => {
             const current = document.documentElement.getAttribute('data-theme');
             const newTheme = current === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', newTheme);
+            this.applyTheme(newTheme);
             localStorage.setItem('dps45_theme', newTheme);
+            this.updateMapTheme(newTheme);
         });
+    }
+
+    switchCity(city, notify = true) {
+        if (!this.CITY_COORDS[city]) return;
+
+        localStorage.setItem('dps45_city', city);
+        
+        // Update all UI elements (menu buttons)
+        document.querySelectorAll(`.city-nav-btn`).forEach(btn => {
+            if (btn.getAttribute('data-city') === city) btn.classList.add('active');
+            else btn.classList.remove('active');
+        });
+
+        const cityText = document.getElementById('city-selector-text');
+        if (cityText) {
+            const cityName = city === 'schuchye' ? 'Щучье' : city === 'shumikha' ? 'Шумиха' : 'Мишкино';
+            cityText.textContent = `Ваш город (${cityName})`;
+        }
+
+        // Move map
+        if (this.map) {
+            this.map.setCenter(this.CITY_COORDS[city], 14, { duration: 1000 });
+        }
+
+        if (notify) {
+            const cityName = city === 'schuchye' ? 'Щучье' : city === 'shumikha' ? 'Шумиха' : 'Мишкино';
+            this.showSuccess(`Выбран город: ${cityName}`);
+        }
+    }
+
+    initCitySelector() {
+        const cityButtons = document.querySelectorAll('.city-nav-btn');
+        const currentCity = localStorage.getItem('dps45_city') || 'shumikha';
+
+        cityButtons.forEach(btn => {
+            const city = btn.getAttribute('data-city');
+            btn.addEventListener('click', () => this.switchCity(city));
+        });
+
+        // Initial sync
+        this.switchCity(currentCity, false);
+    }
+
+    initMarkerSize() {
+        // Update UI based on initial value
+        document.querySelectorAll('.size-btn').forEach(btn => {
+            if (parseInt(btn.getAttribute('data-size')) === this.markerSize) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation(); // prevent settings-item click
+                const size = parseInt(btn.getAttribute('data-size'));
+                this.updateMarkerSize(size);
+            });
+        });
+
+        this.updateMarkerSizeUI();
+    }
+
+    updateMarkerSize(size) {
+        this.markerSize = size;
+        localStorage.setItem('dps45_marker_size', size);
+        
+        document.querySelectorAll('.size-btn').forEach(b => {
+            b.classList.toggle('active', parseInt(b.getAttribute('data-size')) === size);
+        });
+
+        this.updateMarkerSizeUI();
+        this.renderMarkers();
+        this.showSuccess('Размер меток изменен');
+    }
+
+    updateMarkerSizeUI() {
+        const text = document.getElementById('marker-size-text');
+        if (text) {
+            let label = 'Средний';
+            if (this.markerSize < 30) label = 'Маленький';
+            if (this.markerSize > 40) label = 'Большой';
+            text.textContent = `Размер меток (${label})`;
+        }
+    }
+
+    applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        const themeText = document.getElementById('theme-text');
+        const themeTag = document.querySelector('.theme-status-tag');
+        
+        console.log('Applying theme:', theme);
+        
+        if (theme === 'dark') {
+            if (themeText) themeText.textContent = 'Тёмная тема';
+            if (themeTag) {
+                themeTag.textContent = 'Вкл';
+                themeTag.classList.add('active');
+            }
+        } else {
+            if (themeText) themeText.textContent = 'Светлая тема';
+            if (themeTag) {
+                themeTag.textContent = 'Выкл';
+                themeTag.classList.remove('active');
+            }
+        }
+    }
+
+    updateMapTheme(theme) {
+        if (!this.map) {
+            console.log('Map not ready for theme update');
+            return;
+        }
+        const mapType = theme === 'dark' ? 'yandex#hybrid' : 'yandex#map';
+        console.log('Setting map type to:', mapType);
+        this.map.setType(mapType);
     }
     
     async checkAuth() {
@@ -100,7 +225,12 @@ class DPSMap {
             if (response.ok) {
                 const data = await response.json();
                 this.currentUser = data.user;
+                // Fix: Sync deviceId with userId for registered users
+                if (data.user && data.user.id) {
+                    this.deviceId = data.user.id;
+                }
                 this.updateAuthUI();
+                this.showSuccess(`С возвращением, ${this.currentUser.username}!`);
             }
         } catch (error) {
             console.error('Auth check error:', error);
@@ -108,16 +238,21 @@ class DPSMap {
         
         // Setup logout button
         document.getElementById('btn-logout').addEventListener('click', async () => {
+            const confirmed = await this.showConfirm('Выход', 'Вы уверены, что хотите выйти из аккаунта?');
+            if (!confirmed) return;
+
             try {
-                await fetch('/api/auth/logout', { method: 'POST' });
+                await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
                 this.currentUser = null;
                 this.updateAuthUI();
+                this.showSuccess('Вы успешно вышли из аккаунта');
                 
                 // Show auth visual section
                 document.getElementById('auth-section').style.display = 'block';
                 document.getElementById('profile-section').style.display = 'none';
             } catch (error) {
                 console.error('Logout error:', error);
+                this.showError('Ошибка при выходе');
             }
         });
     }
@@ -150,26 +285,21 @@ class DPSMap {
     }
 
     initUI() {
+        // initCitySelector is now called in initMap after map is ready
+
         // Overlay logic
         const overlay = document.getElementById('drawer-overlay');
-        const closeAllDrawers = () => {
-            overlay.classList.remove('active');
-            document.querySelectorAll('.drawer-modal, .bottom-sheet').forEach(m => m.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById('nav-map').classList.add('active'); // default to map active
-        };
-
-        overlay.addEventListener('click', closeAllDrawers);
+        overlay.addEventListener('click', () => this.closeAllDrawers());
 
         // ESC key closes any open drawer or bottom sheet
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeAllDrawers();
+            if (e.key === 'Escape') this.closeAllDrawers();
         });
 
         // Bottom Nav logic
         document.getElementById('nav-map').addEventListener('click', (e) => {
             e.preventDefault();
-            closeAllDrawers();
+            this.closeAllDrawers();
         });
 
         document.getElementById('nav-add').addEventListener('click', (e) => {
@@ -179,23 +309,19 @@ class DPSMap {
                 document.getElementById('nav-settings').click();
                 return;
             }
-            if (!this.newMarkerCoords) {
-                this.showError('Сначала нажмите на карту, чтобы выбрать место.');
-                return;
-            }
             
-            closeAllDrawers();
+            this.closeAllDrawers();
+            this.isPlacementMode = true;
+            document.getElementById('map').classList.add('placement-active');
+            this.showSuccess('Выберите место на карте, нажав на нужную точку');
+            
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('nav-add').classList.add('active');
-            overlay.classList.add('active');
-            document.getElementById('add-post-drawer').classList.add('active');
-            
-            // Trigger tags regeneration
-            this.generateTags(document.getElementById('post-type').value);
         });
 
         document.getElementById('nav-settings').addEventListener('click', (e) => {
             e.preventDefault();
-            closeAllDrawers();
+            this.closeAllDrawers();
             document.getElementById('nav-settings').classList.add('active');
             overlay.classList.add('active');
             document.getElementById('settings-drawer').classList.add('active');
@@ -203,7 +329,7 @@ class DPSMap {
 
         // Drawer Close Buttons
         document.querySelectorAll('.drawer-close').forEach(btn => {
-            btn.addEventListener('click', closeAllDrawers);
+            btn.addEventListener('click', () => this.closeAllDrawers());
         });
 
         // Auth Tabs
@@ -242,8 +368,11 @@ class DPSMap {
                 
                 if (response.ok) {
                     this.currentUser = data.user;
+                    if (data.user && data.user.id) this.deviceId = data.user.id;
                     this.updateAuthUI();
+                    this.showSuccess('Вы успешно вошли в систему');
                     document.getElementById('login-form').reset();
+                    this.closeAllDrawers();
                 } else {
                     this.showError(data.error || 'Ошибка входа');
                 }
@@ -267,8 +396,11 @@ class DPSMap {
                 
                 if (response.ok) {
                     this.currentUser = data.user;
+                    if (data.user && data.user.id) this.deviceId = data.user.id;
                     this.updateAuthUI();
+                    this.showSuccess('Аккаунт успешно создан!');
                     document.getElementById('register-form').reset();
+                    this.closeAllDrawers();
                 } else {
                     this.showError(data.error || 'Ошибка регистрации');
                 }
@@ -328,12 +460,13 @@ class DPSMap {
                 });
 
                 if (response.ok) {
-                    closeAllDrawers();
+                    this.closeAllDrawers();
                     document.getElementById('add-post-form').reset();
                     this.selectedTags = []; // clear tags
                     await this.loadPosts();
                     this.renderMarkers();
                     this.newMarkerCoords = null; // reset coords
+                    this.showSuccess('Метка успешно добавлена');
                 } else {
                     const data = await response.json();
                     this.showError(data.error || 'Ошибка создания метки');
@@ -414,6 +547,13 @@ class DPSMap {
     }
 
     updateBottomSheetTimes(post) {
+        // Update usernames (Creator and Last Voter)
+        const authorName = document.getElementById('post-author-name');
+        const lastVoterName = document.getElementById('post-last-voter-name');
+        
+        if (authorName) authorName.textContent = post.username || 'Аноним';
+        if (lastVoterName) lastVoterName.textContent = post.last_voter_username || '—';
+
         const relevantTime = document.getElementById('relevant-time');
         // const irrelevantTime = document.getElementById('irrelevant-time');
         
@@ -427,22 +567,35 @@ class DPSMap {
 
     initMap() {
         ymaps.ready(() => {
-            const SHUMIKHA_LIMITS = [
-                [54.85, 62.80],
-                [55.45, 63.80]
+            const MAP_LIMITS = [
+                [54.80, 62.60],
+                [55.50, 64.10]
             ];
 
+            const savedTheme = localStorage.getItem('dps45_theme') || 'light';
+            const initialMapType = savedTheme === 'dark' ? 'yandex#hybrid' : 'yandex#map';
+
+            const savedCity = localStorage.getItem('dps45_city');
+            const defaultCenter = savedCity ? this.CITY_COORDS[savedCity] : this.CITY_COORDS.shumikha;
+
             this.map = new ymaps.Map('map', {
-                center: [55.2255, 63.2982],
+                center: defaultCenter || this.CITY_COORDS.shumikha,
                 zoom: 12,
+                type: initialMapType,
                 controls: ['zoomControl', 'geolocationControl']
             }, {
                 searchControlProvider: 'yandex#search',
                 suppressMapOpenBlock: true,
-                restrictMapArea: SHUMIKHA_LIMITS,
+                restrictMapArea: MAP_LIMITS,
                 minZoom: 10,
                 maxZoom: 18
             });
+
+            if (!savedCity) {
+                this.showCityModal(this.CITY_COORDS);
+            } else {
+                this.initCitySelector();
+            }
 
             this.renderMarkers();
             this.hideLoading();
@@ -451,6 +604,8 @@ class DPSMap {
             this.map.events.add('click', (e) => {
                 const drawers = document.querySelectorAll('.drawer-modal.active, .bottom-sheet.active');
                 if (drawers.length > 0) {
+                    this.isPlacementMode = false;
+                    document.getElementById('map').classList.remove('placement-active');
                     drawers.forEach(d => d.classList.remove('active'));
                     document.getElementById('drawer-overlay').classList.remove('active');
                     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -458,15 +613,47 @@ class DPSMap {
                     return;
                 }
 
-                if (!this.currentUser) {
-                    alert('Войдите в систему (нажав на Шестеренку), чтобы добавить метку');
+                if (this.isPlacementMode) {
+                    this.newMarkerCoords = e.get('coords');
+                    this.isPlacementMode = false;
+                    document.getElementById('map').classList.remove('placement-active');
+                    
+                    // Open the add post drawer
+                    document.getElementById('drawer-overlay').classList.add('active');
+                    document.getElementById('add-post-drawer').classList.add('active');
+                    this.generateTags(document.getElementById('post-type').value);
                     return;
                 }
-
-                // Show modal to add a marker
-                this.newMarkerCoords = e.get('coords');
-                document.getElementById('nav-add').click();
             });
+
+            // Automatically try to find user's city/location
+            setTimeout(() => {
+                if (localStorage.getItem('dps45_city')) return; // Priority to saved city
+
+                console.log('Attempting auto-geolocation...');
+                ymaps.geolocation.get({
+                    provider: 'browser',
+                    mapStateAutoApply: true
+                }).then((result) => {
+                    const coords = result.geoObjects.get(0).geometry.getCoordinates();
+                    if (coords) {
+                        this.map.setCenter(coords, 14, { duration: 1500, flying: true });
+                        this.showNotification('Местоположение определено', 'success');
+                    }
+                }).catch((err) => {
+                    console.log('Browser geolocation failed, trying Yandex...', err);
+                    // Fallback to Yandex (IP based usually)
+                    ymaps.geolocation.get({
+                        provider: 'yandex',
+                        autoReverseGeocode: true
+                    }).then((result) => {
+                        const coords = result.geoObjects.get(0).geometry.getCoordinates();
+                        if (coords) {
+                            this.map.setCenter(coords, 12, { duration: 1000, flying: true });
+                        }
+                    });
+                });
+            }, 1000); 
         });
     }
 
@@ -475,6 +662,8 @@ class DPSMap {
             this.map.geoObjects.remove(marker);
         });
         this.markers = {};
+
+        if (!this.posts || !Array.isArray(this.posts)) return;
 
         this.posts.forEach(post => {
             // Logic for active vs inactive (stale or marked as irrelevant)
@@ -502,9 +691,12 @@ class DPSMap {
                 ? 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' 
                 : 'grayscale(100%) opacity(0.4)';
 
+            const sizeValue = this.markerSize;
+            const halfSize = sizeValue / 2;
+
             // Create a custom HTML layout for the marker
             const CustomIconLayout = ymaps.templateLayoutFactory.createClass(
-                `<div style="font-size: 32px; line-height: 32px; transform: translate(-50%, -50%); cursor: pointer; filter: ${filterStyle}; transition: filter 0.3s ease;">
+                `<div style="font-size: ${sizeValue}px; line-height: ${sizeValue}px; transform: translate(-50%, -50%); cursor: pointer; filter: ${filterStyle}; transition: all 0.3s ease;">
                     ${emojiStr}
                 </div>`
             );
@@ -522,7 +714,7 @@ class DPSMap {
                     iconShape: {
                         type: 'Rectangle',
                         coordinates: [
-                            [-16, -16], [16, 16]
+                            [-halfSize, -halfSize], [halfSize, halfSize]
                         ]
                     },
                     hideIconOnBalloonOpen: false
@@ -563,7 +755,7 @@ class DPSMap {
         typeBadge.textContent = post.type || 'ДПС';
         typeBadge.className = `post-type-badge ${this.getTypeClass(post.type)}`;
         
-        document.getElementById('post-author').textContent = post.username ? `@${post.username}` : '@аноним';
+        // Author will be updated in updateBottomSheetTimes
         
         // Tags
         const tagsContainer = document.getElementById('post-tags-container');
@@ -636,6 +828,7 @@ class DPSMap {
 
             if (response.ok) {
                 this.showMessage('success', data.message || 'Голос принят!');
+                this.showSuccess('Голос принят');
                 await this.loadPosts();
                 this.renderMarkers();
                 const updatedPost = this.posts.find(p => p.post_id === this.currentPost.post_id);
@@ -645,12 +838,14 @@ class DPSMap {
                 }
             } else {
                 this.showMessage('warning', data.error || 'Ошибка при голосовании');
+                this.showError(data.error || 'Ошибка голосования');
                 btnRelevant.disabled = false;
                 btnIrrelevant.disabled = false;
             }
         } catch (error) {
             console.error('Vote error:', error);
             this.showMessage('error', 'Не удалось отправить голос');
+            this.showError('Не удалось отправить голос');
             btnRelevant.disabled = false;
             btnIrrelevant.disabled = false;
         }
@@ -658,7 +853,12 @@ class DPSMap {
 
     async deleteOwnPost() {
         if (!this.currentPost) return;
-        if (!confirm('Удалить вашу метку? Это действие необратимо.')) return;
+        
+        const confirmed = await this.showConfirm(
+            'Удаление метки', 
+            'Вы уверены, что хотите удалить вашу метку? Это действие нельзя будет отменить.'
+        );
+        if (!confirmed) return;
 
         const postId = this.currentPost.post_id;
         if (!postId) {
@@ -674,10 +874,10 @@ class DPSMap {
             
             if (response.ok) {
                 const data = await response.json();
-                // Close bottom sheet
                 document.getElementById('bottom-sheet').classList.remove('active');
                 document.getElementById('drawer-overlay').classList.remove('active');
                 this.currentPost = null;
+                this.showSuccess('Метка удалена');
                 // Refresh map
                 await this.loadPosts();
                 this.renderMarkers();
@@ -699,13 +899,76 @@ class DPSMap {
 
     showMessage(type, text) {
         const message = document.getElementById('vote-message');
-        message.className = `vote-message ${type}`;
-        message.textContent = text;
-        message.style.display = 'block';
+        if (message) {
+            message.className = `vote-message ${type}`;
+            message.textContent = text;
+            message.style.display = 'block';
+        }
+    }
+
+    showNotification(text, type = 'info') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        const icon = document.createElement('i');
+        if (type === 'success') icon.className = 'fa-solid fa-circle-check';
+        else if (type === 'error') icon.className = 'fa-solid fa-circle-xmark';
+        else icon.className = 'fa-solid fa-circle-info';
+        
+        const span = document.createElement('span');
+        span.textContent = text;
+        
+        toast.appendChild(icon);
+        toast.appendChild(span);
+        container.appendChild(toast);
+
+        // Auto remove after 3s
+        setTimeout(() => {
+            toast.classList.add('hide');
+            setTimeout(() => toast.remove(), 400);
+        }, 3000);
+    }
+
+    showSuccess(text) {
+        this.showNotification(text, 'success');
     }
 
     showError(text) {
-        alert(text);
+        this.showNotification(text, 'error');
+    }
+
+    showConfirm(title, message) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('confirm-modal');
+            const titleEl = document.getElementById('confirm-title');
+            const msgEl = document.getElementById('confirm-message');
+            const okBtn = document.getElementById('confirm-ok');
+            const cancelBtn = document.getElementById('confirm-cancel');
+
+            titleEl.textContent = title;
+            msgEl.textContent = message;
+            modal.classList.add('active');
+
+            const onOk = () => {
+                modal.classList.remove('active');
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                resolve(true);
+            };
+
+            const onCancel = () => {
+                modal.classList.remove('active');
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                resolve(false);
+            };
+
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', onCancel);
+        });
     }
 
     hideLoading() {
@@ -714,6 +977,32 @@ class DPSMap {
             loading.classList.add('hidden');
             setTimeout(() => { if (loading.parentNode) loading.remove(); }, 300);
         }
+    }
+
+    showCityModal(CITY_COORDS) {
+        const modal = document.getElementById('city-modal');
+        if (!modal) return;
+        
+        modal.classList.add('active');
+        
+        modal.querySelectorAll('.city-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const city = btn.getAttribute('data-city');
+                this.switchCity(city);
+                modal.classList.remove('active');
+            });
+        });
+    }
+
+    closeAllDrawers() {
+        const overlay = document.getElementById('drawer-overlay');
+        overlay.classList.remove('active');
+        document.querySelectorAll('.drawer-modal, .bottom-sheet').forEach(m => m.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById('nav-map').classList.add('active'); // default to map active
+        
+        this.isPlacementMode = false;
+        document.getElementById('map').classList.remove('placement-active');
     }
 }
 

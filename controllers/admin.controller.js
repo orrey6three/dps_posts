@@ -44,10 +44,24 @@ class AdminController {
   async createPost(req, res) {
     try {
       const { title, address, latitude, longitude, type, comment, tags } = req.body;
+      
       if (!title || !latitude || !longitude || !type) {
         return res.status(400).json({ error: 'Обязательные поля: title, latitude, longitude, type' });
       }
-      const post = await postService.createPost(title, address, latitude, longitude, type, comment, tags, req.user ? req.user.id : null);
+
+      let userId = req.user ? req.user.id : null;
+
+      // Robust fix for old sessions where id might be 'admin' string
+      if (userId === 'admin') {
+        const { data: adminUser } = await supabaseAdmin
+          .from('users')
+          .select('id')
+          .eq('username', 'admin')
+          .single();
+        if (adminUser) userId = adminUser.id;
+      }
+
+      const post = await postService.createPost(title, address, latitude, longitude, type, comment, tags, userId);
       res.json({ success: true, post });
     } catch (error) {
       console.error('Error creating post:', error);

@@ -9,7 +9,44 @@ class AdminPanel {
         this.pendingDelete = null;
         this.currentTab = 'posts';
         this.init();
+        this.applyTheme();
+        
+        // Listen for theme changes in other tabs
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'dps45_theme') this.applyTheme();
+        });
+
         window.adminPanel = this;
+    }
+
+    applyTheme() {
+        const theme = localStorage.getItem('dps45_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+        
+        // Update icons
+        const moonIcon = document.querySelector('#admin-theme-toggle .moon-icon');
+        const sunIcon = document.querySelector('#admin-theme-toggle .sun-icon');
+        if (moonIcon && sunIcon) {
+            moonIcon.style.display = theme === 'dark' ? 'none' : 'inline-block';
+            sunIcon.style.display = theme === 'dark' ? 'inline-block' : 'none';
+        }
+
+        if (this.map) {
+            const mapType = theme === 'dark' ? 'yandex#hybrid' : 'yandex#map';
+            this.map.setType(mapType);
+        }
+    }
+
+    initThemeToggle() {
+        const toggleBtn = document.getElementById('admin-theme-toggle');
+        if (!toggleBtn) return;
+
+        toggleBtn.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            const newTheme = current === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('dps45_theme', newTheme);
+            this.applyTheme();
+        });
     }
 
     showToast(type, text, timeoutMs = 2200) {
@@ -30,6 +67,7 @@ class AdminPanel {
         await this.checkAuth();
         this.initEventListeners();
         this.initTabs();
+        this.initThemeToggle();
     }
 
     initTabs() {

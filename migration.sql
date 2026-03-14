@@ -1,6 +1,14 @@
 -- DPS45 Database Schema V3
 -- Run this script in your Supabase SQL Editor
 
+-- Cleanup existing objects if they exist
+DROP FUNCTION IF EXISTS get_post_stats();
+DROP TABLE IF EXISTS votes CASCADE;
+DROP TABLE IF EXISTS posts CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TYPE IF EXISTS vote_type_enum CASCADE;
+DROP TYPE IF EXISTS user_role_enum CASCADE;
+
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -121,10 +129,17 @@ RETURNS TABLE (
     last_irrelevant TIMESTAMP WITH TIME ZONE,
     last_activity TIMESTAMP WITH TIME ZONE,
     relevant_count BIGINT,
-    irrelevant_count BIGINT
+    irrelevant_count BIGINT,
+    last_voter_username TEXT
 ) AS $$
+#variable_conflict use_column
 BEGIN
     RETURN QUERY
+    WITH last_votes AS (
+        SELECT DISTINCT ON (votes.post_id) votes.post_id, votes.device_id, votes.created_at
+        FROM votes
+        ORDER BY votes.post_id, votes.created_at DESC
+    )
     SELECT 
         p.id as post_id,
         p.title,
@@ -141,11 +156,19 @@ BEGIN
         MAX(CASE WHEN v.vote_type = 'irrelevant' THEN v.created_at END) as last_irrelevant,
         MAX(v.created_at) as last_activity,
         COUNT(CASE WHEN v.vote_type = 'relevant' THEN 1 END) as relevant_count,
-        COUNT(CASE WHEN v.vote_type = 'irrelevant' THEN 1 END) as irrelevant_count
+        COUNT(CASE WHEN v.vote_type = 'irrelevant' THEN 1 END) as irrelevant_count,
+        (
+            SELECT vu.username 
+            FROM users vu 
+            WHERE vu.id::text = lv.device_id 
+               OR vu.username = lv.device_id -- fallback if device_id was stored as username
+            LIMIT 1
+        ) as last_voter_username
     FROM posts p
     LEFT JOIN votes v ON p.id = v.post_id
     LEFT JOIN users u ON p.user_id = u.id
-    GROUP BY p.id, p.title, p.address, p.latitude, p.longitude, p.type, p.comment, p.tags, p.user_id, u.username, p.created_at
+    LEFT JOIN last_votes lv ON p.id = lv.post_id
+    GROUP BY p.id, p.title, p.address, p.latitude, p.longitude, p.type, p.comment, p.tags, p.user_id, u.username, p.created_at, lv.device_id
     ORDER BY p.title;
 END;
 $$ LANGUAGE plpgsql;
