@@ -4,103 +4,190 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DPS45 — Админ панель</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
 </head>
 <body>
+
+<!-- Login Screen -->
 <div id="login-screen">
     <div class="login-card">
-        <h1>Админ панель</h1>
+        <div class="login-logo">
+            <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <h1>DPS45 Admin</h1>
+        <p class="login-subtitle">Панель управления</p>
         <form id="login-form">
-            <label for="password-input">Пароль</label>
-            <input type="password" id="password-input" placeholder="Введите пароль" required>
-            <button type="submit">Войти</button>
+            <label for="password-input">Пароль администратора</label>
+            <input type="password" id="password-input" placeholder="Введите пароль" required autocomplete="current-password">
+            <button type="submit"><i class="fa-solid fa-right-to-bracket"></i> Войти</button>
             <div id="login-error" class="hidden"></div>
         </form>
-        <a href="/" class="login-back">← Назад к карте</a>
+        <a href="/" class="login-back"><i class="fa-solid fa-arrow-left"></i> Назад к карте</a>
     </div>
 </div>
 
+<!-- Admin Panel -->
 <div id="admin-panel" class="hidden">
+
+    <!-- Header -->
     <header class="admin-header">
         <div class="admin-header-inner">
-            <div>
-                <h1>DPS45</h1>
-                <p>Управление постами ДПС</p>
+            <div class="admin-brand">
+                <i class="fa-solid fa-shield-halved admin-brand-icon"></i>
+                <div>
+                    <h1>DPS45</h1>
+                    <p>Панель управления</p>
+                </div>
             </div>
-            <div style="display: flex; gap: 16px;">
-                <a href="/">Карта</a>
-                <button id="logout-btn">Выйти</button>
+            <div class="admin-header-actions">
+                <a href="/" class="header-btn"><i class="fa-solid fa-map-location-dot"></i> Карта</a>
+                <button id="logout-btn" class="header-btn danger"><i class="fa-solid fa-arrow-right-from-bracket"></i> Выйти</button>
             </div>
         </div>
     </header>
 
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+        <div class="stats-bar-inner">
+            <div class="stat-card">
+                <div class="stat-icon posts"><i class="fa-solid fa-location-pin"></i></div>
+                <div>
+                    <div class="stat-value" id="stat-posts">—</div>
+                    <div class="stat-label">Меток</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon users"><i class="fa-solid fa-users"></i></div>
+                <div>
+                    <div class="stat-value" id="stat-users">—</div>
+                    <div class="stat-label">Пользователей</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon votes"><i class="fa-solid fa-check-to-slot"></i></div>
+                <div>
+                    <div class="stat-value" id="stat-votes">—</div>
+                    <div class="stat-label">Голосов</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="admin-tabs-bar">
+        <div class="admin-tabs-inner">
+            <button class="admin-tab active" data-tab="posts"><i class="fa-solid fa-location-pin"></i> Метки</button>
+            <button class="admin-tab" data-tab="users"><i class="fa-solid fa-users"></i> Пользователи</button>
+        </div>
+    </div>
+
     <main class="admin-main">
-        <button id="add-post-btn" class="add-post-btn">+ Добавить пост</button>
-        <div id="posts-list" class="posts-list"></div>
-        <div id="admin-loading" class="admin-loading hidden">
-            <div class="admin-spinner"></div>
+        <!-- Posts Tab -->
+        <div id="tab-posts" class="tab-content active">
+            <div class="section-toolbar">
+                <h2 class="section-title">Метки на карте</h2>
+                <button id="add-post-btn" class="action-btn primary"><i class="fa-solid fa-plus"></i> Добавить</button>
+            </div>
+            <div id="admin-loading" class="admin-loading hidden"><div class="admin-spinner"></div></div>
+            <div id="posts-list" class="posts-list"></div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="tab-users" class="tab-content hidden">
+            <div class="section-toolbar">
+                <h2 class="section-title">Пользователи</h2>
+                <button id="refresh-users-btn" class="action-btn secondary"><i class="fa-solid fa-rotate-right"></i> Обновить</button>
+            </div>
+            <div id="users-loading" class="admin-loading hidden"><div class="admin-spinner"></div></div>
+            <div id="users-table-wrap">
+                <table class="users-table" id="users-table">
+                    <thead>
+                        <tr>
+                            <th>Пользователь</th>
+                            <th>Роль</th>
+                            <th>Меток</th>
+                            <th>Зарегистрирован</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-tbody"></tbody>
+                </table>
+            </div>
         </div>
     </main>
 </div>
 
-<div id="post-modal" class="modal-overlay hidden">
+<!-- Post Modal -->
+<div id="post-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
     <div class="modal-content">
         <div class="modal-header">
-            <h2 id="modal-title">Добавить пост</h2>
-            <button id="close-modal" class="modal-close" aria-label="Закрыть">
-                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+            <h2 id="modal-title-text">Добавить метку</h2>
+            <button id="close-modal" class="modal-close" aria-label="Закрыть"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
             <form id="post-form">
                 <input type="hidden" id="post-id">
-                <label for="post-title">Название *</label>
-                <input type="text" id="post-title" required>
-
-                <label>Местоположение (кликните на карту)</label>
-                <div id="modal-map"></div>
-
                 <div class="form-row">
-                    <div>
+                    <div class="form-group">
+                        <label>Тип</label>
+                        <select id="post-type-select">
+                            <option value="ДПС">🚔 ДПС</option>
+                            <option value="Нужна помощь">🆘 Нужна помощь</option>
+                            <option value="Вопрос">⚠️ Вопрос</option>
+                            <option value="Чисто">✅ Чисто</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="post-address">Адрес</label>
+                        <input type="text" id="post-address" placeholder="Автоматически с карты">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Комментарий</label>
+                    <textarea id="post-comment-admin" placeholder="Необязательно (до 125 символов)" maxlength="125" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Местоположение <span class="hint">— кликните или перетащите маркер на карте</span></label>
+                    <div id="modal-map"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
                         <label for="post-latitude">Широта</label>
                         <input type="number" step="0.000001" id="post-latitude" required>
                     </div>
-                    <div>
+                    <div class="form-group">
                         <label for="post-longitude">Долгота</label>
                         <input type="number" step="0.000001" id="post-longitude" required>
                     </div>
                 </div>
-
-                <label for="post-address">Адрес</label>
-                <input type="text" id="post-address">
-
                 <div class="form-actions">
-                    <button type="submit" class="btn-save">Сохранить</button>
-                    <button type="button" id="cancel-modal" class="btn-cancel">Отмена</button>
+                    <button type="submit" class="action-btn primary btn-full" id="post-save-btn"><i class="fa-solid fa-floppy-disk"></i> Сохранить</button>
+                    <button type="button" id="cancel-modal" class="action-btn secondary">Отмена</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+<!-- Confirm Delete Post Modal -->
 <div id="confirm-delete-modal" class="modal-overlay hidden" aria-hidden="true">
-    <div class="modal-content confirm-content" role="dialog" aria-modal="true" aria-labelledby="confirm-delete-title">
+    <div class="modal-content confirm-content" role="dialog" aria-modal="true">
         <div class="modal-header">
-            <h2 id="confirm-delete-title">Удалить пост?</h2>
-            <button id="confirm-delete-close" class="modal-close" aria-label="Закрыть">
-                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+            <h2>Удалить?</h2>
+            <button id="confirm-delete-close" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
-            <p class="confirm-text">Пост будет удалён навсегда. Это действие нельзя отменить.</p>
+            <p class="confirm-text">Это действие необратимо.</p>
             <div class="confirm-box">
-                <div class="confirm-label">Пост</div>
+                <div class="confirm-label">Объект</div>
                 <div id="confirm-delete-name" class="confirm-name"></div>
             </div>
             <div class="form-actions">
-                <button type="button" id="confirm-delete-cancel" class="btn-cancel">Отмена</button>
-                <button type="button" id="confirm-delete-ok" class="btn-danger">Удалить</button>
+                <button type="button" id="confirm-delete-cancel" class="action-btn secondary">Отмена</button>
+                <button type="button" id="confirm-delete-ok" class="action-btn danger"><i class="fa-solid fa-trash"></i> Удалить</button>
             </div>
         </div>
     </div>
@@ -108,12 +195,5 @@
 
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <script type="module" src="/js/admin.js"></script>
-<script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js').catch(() => {});
-        });
-    }
-</script>
 </body>
 </html>

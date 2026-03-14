@@ -1,11 +1,13 @@
 class AdminPanel {
     constructor() {
         this.posts = [];
+        this.users = [];
         this.currentPost = null;
         this.map = null;
         this.placemark = null;
         this.toastTimer = null;
         this.pendingDelete = null;
+        this.currentTab = 'posts';
         this.init();
         window.adminPanel = this;
     }
@@ -13,19 +15,11 @@ class AdminPanel {
     showToast(type, text, timeoutMs = 2200) {
         const el = document.getElementById('toast');
         if (!el) return;
-
-        if (this.toastTimer) {
-            clearTimeout(this.toastTimer);
-            this.toastTimer = null;
-        }
-
+        if (this.toastTimer) { clearTimeout(this.toastTimer); this.toastTimer = null; }
         el.classList.remove('hidden', 'success', 'error', 'warning', 'show');
         el.classList.add(type);
         el.textContent = text;
-
-        // next frame to ensure transition
         requestAnimationFrame(() => el.classList.add('show'));
-
         this.toastTimer = setTimeout(() => {
             el.classList.remove('show');
             this.toastTimer = setTimeout(() => el.classList.add('hidden'), 220);
@@ -35,6 +29,25 @@ class AdminPanel {
     async init() {
         await this.checkAuth();
         this.initEventListeners();
+        this.initTabs();
+    }
+
+    initTabs() {
+        document.querySelectorAll('.admin-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.getAttribute('data-tab');
+                this.switchTab(tab);
+            });
+        });
+    }
+
+    switchTab(tabId) {
+        this.currentTab = tabId;
+        document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tabId));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('hidden', c.id !== `tab-${tabId}`));
+        
+        if (tabId === 'posts') this.loadPosts();
+        if (tabId === 'users') this.loadUsers();
     }
 
     async checkAuth() {
@@ -42,13 +55,22 @@ class AdminPanel {
             const response = await fetch('/admin/api/verify', { credentials: 'include' });
             if (response.ok) {
                 this.showAdminPanel();
+                await this.loadStats();
                 await this.loadPosts();
-            } else {
-                this.showLoginScreen();
+            } else { this.showLoginScreen(); }
+        } catch (error) { this.showLoginScreen(); }
+    }
+
+    async loadStats() {
+        try {
+            const res = await fetch('/admin/api/stats', { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('stat-posts').textContent = data.total_posts;
+                document.getElementById('stat-users').textContent = data.total_users;
+                document.getElementById('stat-votes').textContent = data.total_votes;
             }
-        } catch (error) {
-            this.showLoginScreen();
-        }
+        } catch (e) {}
     }
 
     initEventListeners() {
@@ -58,238 +80,195 @@ class AdminPanel {
         document.getElementById('close-modal')?.addEventListener('click', () => this.hidePostModal());
         document.getElementById('cancel-modal')?.addEventListener('click', () => this.hidePostModal());
         document.getElementById('post-form')?.addEventListener('submit', (e) => this.handlePostSubmit(e));
+        document.getElementById('refresh-users-btn')?.addEventListener('click', () => this.loadUsers());
 
-        // Confirm delete modal
-        document.getElementById('confirm-delete-cancel')?.addEventListener('click', () => this.hideConfirmDelete());
-        document.getElementById('confirm-delete-close')?.addEventListener('click', () => this.hideConfirmDelete());
-        document.getElementById('confirm-delete-ok')?.addEventListener('click', () => this.confirmDelete());
-        document.getElementById('confirm-delete-modal')?.addEventListener('click', (e) => {
-            if (e.target?.id === 'confirm-delete-modal') this.hideConfirmDelete();
-        });
+        // Modal close on ESC
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') this.hideConfirmDelete();
+            if (e.key === 'Escape') {
+                this.hidePostModal();
+                this.hideConfirmDelete();
+            }
         });
 
-        // Event delegation for dynamically rendered post cards
+        // Event delegation for posts
         document.getElementById('posts-list')?.addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-action]');
             if (!btn) return;
-
             const action = btn.getAttribute('data-action');
-            const postId = btn.getAttribute('data-id');
-            if (!postId) return;
-
-            if (action === 'edit') {
-                this.editPost(postId);
-                return;
-            }
-
-            if (action === 'delete') {
-                const title = btn.getAttribute('data-title') || '';
-                this.showConfirmDelete(postId, title);
-            }
+            const id = btn.getAttribute('data-id');
+            if (action === 'edit') this.editPost(id);
+            if (action === 'delete') this.showConfirmDelete('post', id, btn.getAttribute('data-title'));
         });
+
+        // User deletion
+        document.getElementById('users-tbody')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-delete-user');
+            if (!btn) return;
+            const id = btn.getAttribute('data-id');
+            const name = btn.getAttribute('data-username');
+            this.showConfirmDelete('user', id, name);
+        });
+
+        document.getElementById('confirm-delete-cancel')?.addEventListener('click', () => this.hideConfirmDelete());
+        document.getElementById('confirm-delete-close')?.addEventListener('click', () => this.hideConfirmDelete());
+        document.getElementById('confirm-delete-ok')?.addEventListener('click', () => this.confirmDelete());
     }
 
-    showConfirmDelete(postId, title) {
+    showConfirmDelete(type, id, name) {
         const modal = document.getElementById('confirm-delete-modal');
-        const name = document.getElementById('confirm-delete-name');
-        const okBtn = document.getElementById('confirm-delete-ok');
-        if (!modal || !name || !okBtn) return;
-
-        this.pendingDelete = { postId, title };
-        name.textContent = title || 'Без названия';
-        okBtn.disabled = false;
-
+        this.pendingDelete = { type, id, name };
+        document.getElementById('confirm-delete-name').textContent = name || 'Без названия';
         modal.classList.remove('hidden');
-        modal.setAttribute('aria-hidden', 'false');
-        requestAnimationFrame(() => okBtn.focus?.());
     }
 
     hideConfirmDelete() {
-        const modal = document.getElementById('confirm-delete-modal');
-        if (!modal) return;
-        modal.classList.add('hidden');
-        modal.setAttribute('aria-hidden', 'true');
+        document.getElementById('confirm-delete-modal').classList.add('hidden');
         this.pendingDelete = null;
     }
 
     async confirmDelete() {
         if (!this.pendingDelete) return;
-        const okBtn = document.getElementById('confirm-delete-ok');
-        if (okBtn) okBtn.disabled = true;
-
-        const { postId, title } = this.pendingDelete;
-        await this.deletePost(postId, title);
+        const { type, id } = this.pendingDelete;
+        const endpoint = type === 'user' ? `/admin/api/users/${id}` : `/admin/api/posts/${id}`;
+        try {
+            const res = await fetch(endpoint, { method: 'DELETE', credentials: 'include' });
+            if (res.ok) {
+                this.showToast('success', 'Удалено успешно');
+                if (type === 'user') this.loadUsers(); else this.loadPosts();
+                this.loadStats();
+            } else { this.showToast('error', 'Ошибка удаления'); }
+        } catch (e) { this.showToast('error', 'Ошибка сети'); }
         this.hideConfirmDelete();
-    }
-
-    initModalMap(coords) {
-        if (typeof ymaps === 'undefined' || !ymaps.Map) {
-            this.showToast('error', 'Карта Яндекс не загрузилась');
-            return;
-        }
-
-        // Создаём карту один раз и переиспользуем
-        if (!this.map) {
-            this.map = new ymaps.Map('modal-map', {
-                center: coords,
-                zoom: 14,
-                controls: ['zoomControl']
-            });
-
-            this.placemark = new ymaps.Placemark(coords, {}, {
-                preset: 'islands#redDotIcon',
-                draggable: true
-            });
-
-            this.map.events.add('click', (e) => {
-                const newCoords = e.get('coords');
-                this.updateCoordsFields(newCoords);
-            });
-
-            this.placemark.events.add('dragend', () => {
-                const newCoords = this.placemark.geometry.getCoordinates();
-                this.updateCoordsFields(newCoords);
-            });
-
-            this.map.geoObjects.add(this.placemark);
-        } else if (this.placemark) {
-            this.placemark.geometry.setCoordinates(coords);
-            this.map.setCenter(coords);
-        }
-
-        this.map.setZoom(14);
-        // Подгоняем размер после того, как модалка уже показана
-        setTimeout(() => {
-            try {
-                this.map.container.fitToViewport();
-            } catch {}
-        }, 0);
     }
 
     showPostModal(post = null) {
         this.currentPost = post;
         const modal = document.getElementById('post-modal');
-        const form = document.getElementById('post-form');
-
-        const lat = post ? post.latitude : 55.2317;
-        const lon = post ? post.longitude : 63.2892;
-
+        document.getElementById('modal-title-text').textContent = post ? 'Редактировать метку' : 'Добавить метку';
+        
         if (post) {
-            document.getElementById('modal-title').textContent = 'Редактировать пост';
             document.getElementById('post-id').value = post.id;
-            document.getElementById('post-title').value = post.title;
+            document.getElementById('post-type-select').value = post.type;
             document.getElementById('post-address').value = post.address || '';
             document.getElementById('post-latitude').value = post.latitude;
             document.getElementById('post-longitude').value = post.longitude;
+            document.getElementById('post-comment-admin').value = post.comment || '';
         } else {
-            document.getElementById('modal-title').textContent = 'Добавить пост';
-            form.reset();
+            document.getElementById('post-form').reset();
             document.getElementById('post-id').value = '';
-            document.getElementById('post-latitude').value = lat;
-            document.getElementById('post-longitude').value = lon;
+            document.getElementById('post-latitude').value = 55.2317;
+            document.getElementById('post-longitude').value = 63.2892;
         }
 
         modal.classList.remove('hidden');
-        modal.style.display = 'flex';
-
-        ymaps.ready(() => {
-            requestAnimationFrame(() => {
-                setTimeout(() => this.initModalMap([lat, lon]), 300);
-            });
-        });
+        this.initModalMap([parseFloat(document.getElementById('post-latitude').value), parseFloat(document.getElementById('post-longitude').value)]);
     }
 
-    hidePostModal() {
-        const modal = document.getElementById('post-modal');
-        modal.classList.add('hidden');
-        modal.style.display = 'none';
+    hidePostModal() { document.getElementById('post-modal').classList.add('hidden'); }
+
+    initModalMap(coords) {
+        ymaps.ready(() => {
+            if (!this.map) {
+                this.map = new ymaps.Map('modal-map', { center: coords, zoom: 14, controls: ['zoomControl'] });
+                this.placemark = new ymaps.Placemark(coords, {}, { preset: 'islands#redDotIcon', draggable: true });
+                this.map.events.add('click', (e) => {
+                    const newCoords = e.get('coords');
+                    this.updateCoordsFields(newCoords);
+                });
+                this.placemark.events.add('dragend', () => {
+                    this.updateCoordsFields(this.placemark.geometry.getCoordinates());
+                });
+                this.map.geoObjects.add(this.placemark);
+            } else {
+                this.placemark.geometry.setCoordinates(coords);
+                this.map.setCenter(coords);
+            }
+            setTimeout(() => this.map.container.fitToViewport(), 100);
+        });
     }
 
     updateCoordsFields(coords) {
         document.getElementById('post-latitude').value = coords[0].toFixed(6);
         document.getElementById('post-longitude').value = coords[1].toFixed(6);
-        if (this.placemark) this.placemark.geometry.setCoordinates(coords);
-        this.fetchAddressByCoords(coords);
-    }
-
-    fetchAddressByCoords(coords) {
-        if (typeof ymaps === 'undefined' || !ymaps.geocode) return;
-
-        ymaps.geocode(coords).then((res) => {
-            const geoObject = res.geoObjects.get(0);
-            if (geoObject) {
-                const address = geoObject.getAddressLine();
-                if (address) document.getElementById('post-address').value = address;
-            }
-        }).catch(() => {});
+        this.placemark.geometry.setCoordinates(coords);
+        ymaps.geocode(coords).then(res => {
+            const addr = res.geoObjects.get(0)?.getAddressLine();
+            if (addr) document.getElementById('post-address').value = addr;
+        });
     }
 
     async loadPosts() {
-        const loadingDiv = document.getElementById('admin-loading');
-        loadingDiv.classList.remove('hidden');
+        const loading = document.getElementById('admin-loading');
+        loading.classList.remove('hidden');
         try {
-            const response = await fetch('/admin/api/posts', { credentials: 'include' });
-            const data = await response.json();
+            const res = await fetch('/admin/api/posts', { credentials: 'include' });
+            const data = await res.json();
             this.posts = data.posts;
             this.renderPosts();
-        } catch (error) {
-            console.error(error);
-        } finally {
-            loadingDiv.classList.add('hidden');
-        }
+        } finally { loading.classList.add('hidden'); }
     }
 
     renderPosts() {
-        const postsListDiv = document.getElementById('posts-list');
-        if (this.posts.length === 0) {
-            postsListDiv.innerHTML = '<div class="empty-state">Постов пока нет</div>';
-            return;
-        }
-
-        postsListDiv.innerHTML = this.posts.map(post => `
+        const list = document.getElementById('posts-list');
+        if (this.posts.length === 0) { list.innerHTML = '<div class="empty-state">Нет меток</div>'; return; }
+        list.innerHTML = this.posts.map(p => `
             <div class="post-card">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-                    <div style="flex: 1;">
-                        <h3>${this.escapeHtml(post.title)}</h3>
-                        <p class="post-address">${this.escapeHtml(post.address || 'Адрес не указан')}</p>
-                        <p class="post-coords">📍 ${post.latitude.toFixed(4)}, ${post.longitude.toFixed(4)}</p>
+                <div class="post-card-header">
+                    <div class="post-card-info">
+                        <h3>${this.escapeHtml(p.title)} <span class="badge ${p.type}">${p.type}</span></h3>
+                        <p class="post-address">${this.escapeHtml(p.address || 'Без адреса')}</p>
                     </div>
                     <div class="post-card-actions">
-                        <button class="btn-edit" data-action="edit" data-id="${this.escapeHtml(post.id)}" title="Редактировать">
-                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                        </button>
-                        <button class="btn-delete" data-action="delete" data-id="${this.escapeHtml(post.id)}" data-title="${this.escapeHtml(post.title)}" title="Удалить">
-                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                        </button>
+                        <button class="btn-icon edit" data-action="edit" data-id="${p.id}"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-icon delete" data-action="delete" data-id="${p.id}" data-title="${p.title}"><i class="fa-solid fa-trash"></i></button>
                     </div>
                 </div>
-                ${post.stats ? `
-                    <div class="post-stats">
-                        <div class="post-stat"><div class="post-stat-value green">${post.stats.relevant}</div><div class="post-stat-label">Актуально</div></div>
-                        <div class="post-stat"><div class="post-stat-value gray">${post.stats.irrelevant}</div><div class="post-stat-label">Неактуально</div></div>
-                        <div class="post-stat"><div class="post-stat-value blue">${post.stats.total}</div><div class="post-stat-label">Всего</div></div>
-                    </div>
-                ` : ''}
+                ${p.stats ? `
+                <div class="post-stats">
+                    <div class="stat-mini"><span class="val green">${p.stats.relevant}</span> Актуально</div>
+                    <div class="stat-mini"><span class="val gray">${p.stats.irrelevant}</span> Старых</div>
+                </div>` : ''}
             </div>
+        `).join('');
+    }
+
+    async loadUsers() {
+        const loading = document.getElementById('users-loading');
+        loading.classList.remove('hidden');
+        try {
+            const res = await fetch('/admin/api/users', { credentials: 'include' });
+            const data = await res.json();
+            this.users = data.users;
+            this.renderUsers();
+        } finally { loading.classList.add('hidden'); }
+    }
+
+    renderUsers() {
+        const tbody = document.getElementById('users-tbody');
+        tbody.innerHTML = this.users.map(u => `
+            <tr>
+                <td><strong>${this.escapeHtml(u.username)}</strong></td>
+                <td><span class="badge ${u.role}">${u.role}</span></td>
+                <td>${u.post_count}</td>
+                <td>${new Date(u.created_at).toLocaleDateString()}</td>
+                <td>
+                    ${u.role !== 'admin' ? `<button class="btn-icon delete btn-delete-user" data-id="${u.id}" data-username="${u.username}"><i class="fa-solid fa-user-minus"></i></button>` : ''}
+                </td>
+            </tr>
         `).join('');
     }
 
     async handleLogin(e) {
         e.preventDefault();
         const password = document.getElementById('password-input').value;
-        const errorDiv = document.getElementById('login-error');
-        try {
-            const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ username: 'admin', password })
-            });
-            if (response.ok) { this.showAdminPanel(); await this.loadPosts(); }
-            else { errorDiv.textContent = 'Неверный пароль'; errorDiv.classList.remove('hidden'); }
-        } catch (error) { errorDiv.textContent = 'Ошибка входа'; errorDiv.classList.remove('hidden'); }
+        const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: 'admin', password }),
+            credentials: 'include'
+        });
+        if (res.ok) { this.showAdminPanel(); await this.loadStats(); await this.loadPosts(); }
+        else { const err = document.getElementById('login-error'); err.textContent = 'Ошибка входа'; err.classList.remove('hidden'); }
     }
 
     async handleLogout() {
@@ -299,51 +278,24 @@ class AdminPanel {
 
     async handlePostSubmit(e) {
         e.preventDefault();
-        const postId = document.getElementById('post-id').value;
-        const postData = {
-            title: document.getElementById('post-title').value,
-            address: document.getElementById('post-address').value || null,
+        const id = document.getElementById('post-id').value;
+        const data = {
+            title: document.getElementById('post-type-select').value,
+            type: document.getElementById('post-type-select').value,
+            address: document.getElementById('post-address').value,
             latitude: parseFloat(document.getElementById('post-latitude').value),
-            longitude: parseFloat(document.getElementById('post-longitude').value)
+            longitude: parseFloat(document.getElementById('post-longitude').value),
+            comment: document.getElementById('post-comment-admin').value
         };
-        const method = postId ? 'PUT' : 'POST';
-        const url = postId ? `/admin/api/posts/${postId}` : '/admin/api/posts';
-        const response = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(postData)
-        });
-        if (response.ok) {
-            this.hidePostModal();
-            await this.loadPosts();
-            this.showToast('success', postId ? 'Пост обновлён' : 'Пост добавлен');
-        } else {
-            this.showToast('error', 'Не удалось сохранить');
-        }
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/admin/api/posts/${id}` : '/admin/api/posts';
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), credentials: 'include' });
+        if (res.ok) { this.hidePostModal(); this.loadPosts(); this.loadStats(); this.showToast('success', 'Сохранено'); }
+        else { this.showToast('error', 'Ошибка сохранения'); }
     }
 
-    editPost(postId) {
-        const post = this.posts.find(p => p.id === postId);
-        if (post) this.showPostModal(post);
-    }
-
-    async deletePost(postId, title) {
-        const res = await fetch(`/admin/api/posts/${postId}`, { method: 'DELETE', credentials: 'include' });
-        if (res.ok) {
-            await this.loadPosts();
-            this.showToast('success', 'Пост удалён');
-        } else {
-            this.showToast('error', 'Не удалось удалить');
-        }
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
+    editPost(id) { const p = this.posts.find(x => x.id === id); if (p) this.showPostModal(p); }
+    escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
     showLoginScreen() { document.getElementById('login-screen').classList.remove('hidden'); document.getElementById('admin-panel').classList.add('hidden'); }
     showAdminPanel() { document.getElementById('login-screen').classList.add('hidden'); document.getElementById('admin-panel').classList.remove('hidden'); }
 }

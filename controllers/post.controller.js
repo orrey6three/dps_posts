@@ -44,6 +44,41 @@ class PostController {
       res.status(500).json({ error: 'Не удалось создать метку' });
     }
   }
+
+  async deleteOwnPost(req, res) {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+
+      // Fetch post to verify ownership
+      const { supabaseAdmin } = await import('../services/db.service.js');
+      const { data: post, error: fetchError } = await supabaseAdmin
+        .from('posts')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !post) {
+        console.error('Delete check failed: Post not found', { id, fetchError });
+        return res.status(404).json({ 
+          error: 'Метка не найдена', 
+          details: fetchError ? fetchError.message : 'Post not in database',
+          requested_id: id 
+        });
+      }
+
+      // Only allow owner or admin
+      if (post.user_id !== user.id && user.role !== 'admin') {
+        return res.status(403).json({ error: 'Нет прав для удаления этой метки' });
+      }
+
+      await postService.deletePost(id);
+      res.json({ success: true, message: 'Метка удалена' });
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      res.status(500).json({ error: 'Не удалось удалить метку' });
+    }
+  }
 }
 
 export default new PostController();

@@ -74,6 +74,7 @@ class DPSMap {
     }
 
     async init() {
+        this.initTheme();
         await this.checkAuth();
         this.initUI();
         await this.loadPosts();
@@ -81,9 +82,21 @@ class DPSMap {
         this.initRealtime();
     }
     
+    initTheme() {
+        const savedTheme = localStorage.getItem('dps45_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        
+        document.getElementById('theme-toggle')?.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            const newTheme = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('dps45_theme', newTheme);
+        });
+    }
+    
     async checkAuth() {
         try {
-            const response = await fetch('/api/auth/me');
+            const response = await fetch('/api/auth/me', { credentials: 'include' });
             if (response.ok) {
                 const data = await response.json();
                 this.currentUser = data.user;
@@ -113,22 +126,26 @@ class DPSMap {
         const authSection = document.getElementById('auth-section');
         const profileSection = document.getElementById('profile-section');
         const adminBtn = document.getElementById('admin-link');
+        const adminMapBtn = document.getElementById('admin-map-btn');
 
         if (this.currentUser) {
             authSection.style.display = 'none';
             profileSection.style.display = 'block';
             document.getElementById('profile-username').textContent = this.currentUser.username;
             
-            // Hide admin button for regular users
+            // Show/hide admin elements based on role
             if (this.currentUser.role !== 'admin') {
                 adminBtn.style.display = 'none';
+                adminMapBtn.classList.remove('visible');
             } else {
                 adminBtn.style.display = 'flex';
+                adminMapBtn.classList.add('visible');
                 document.querySelector('.profile-role').textContent = 'Администратор';
             }
         } else {
             authSection.style.display = 'block';
             profileSection.style.display = 'none';
+            adminMapBtn.classList.remove('visible');
         }
     }
 
@@ -143,6 +160,11 @@ class DPSMap {
         };
 
         overlay.addEventListener('click', closeAllDrawers);
+
+        // ESC key closes any open drawer or bottom sheet
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeAllDrawers();
+        });
 
         // Bottom Nav logic
         document.getElementById('nav-map').addEventListener('click', (e) => {
@@ -201,6 +223,8 @@ class DPSMap {
         const btnIrrelevant = document.getElementById('btn-irrelevant');
         btnRelevant.addEventListener('click', () => this.vote('relevant'));
         btnIrrelevant.addEventListener('click', () => this.vote('irrelevant'));
+
+        document.getElementById('btn-delete-post').addEventListener('click', () => this.deleteOwnPost());
 
         // Forms logic
         document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -507,6 +531,7 @@ class DPSMap {
 
             placemark.events.add('click', (e) => {
                 e.preventDefault();
+                e.stopPropagation(); // Stop event from reaching map
                 // Map automatically centers so bottom sheet logic happens next
                 this.showPostDetails(post);
             });
@@ -568,6 +593,12 @@ class DPSMap {
         document.getElementById('btn-relevant').disabled = false;
         document.getElementById('btn-irrelevant').disabled = false;
 
+        // Show delete button for the post owner OR admin
+        const deleteBtn = document.getElementById('btn-delete-post');
+        const isOwner = this.currentUser && post.user_id && post.user_id === this.currentUser.id;
+        const isAdmin = this.currentUser && this.currentUser.role === 'admin';
+        deleteBtn.style.display = (isOwner || isAdmin) ? 'block' : 'none';
+
         const message = document.getElementById('vote-message');
         message.className = 'vote-message';
         message.style.display = 'none';
@@ -622,6 +653,47 @@ class DPSMap {
             this.showMessage('error', 'Не удалось отправить голос');
             btnRelevant.disabled = false;
             btnIrrelevant.disabled = false;
+        }
+    }
+
+    async deleteOwnPost() {
+        if (!this.currentPost) return;
+        if (!confirm('Удалить вашу метку? Это действие необратимо.')) return;
+
+        const postId = this.currentPost.post_id;
+        if (!postId) {
+            this.showError('ID метки не найден');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/posts/${postId}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                // Close bottom sheet
+                document.getElementById('bottom-sheet').classList.remove('active');
+                document.getElementById('drawer-overlay').classList.remove('active');
+                this.currentPost = null;
+                // Refresh map
+                await this.loadPosts();
+                this.renderMarkers();
+            } else {
+                let errorMsg = 'Не удалось удалить метку';
+                try {
+                    const data = await response.json();
+                    errorMsg = data.error || errorMsg;
+                } catch (e) {
+                    errorMsg = `Ошибка сервера: ${response.status}`;
+                }
+                this.showError(errorMsg);
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            this.showError('Ошибка при удалении');
         }
     }
 

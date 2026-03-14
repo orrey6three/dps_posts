@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.get('/posts', postController.getPosts);
 router.post('/posts', requireAuth, postController.createPostByUser);
+router.delete('/posts/:id', requireAuth, postController.deleteOwnPost);
 router.post('/vote', voteController.submitVote);
 
 router.get('/health', (req, res) => {

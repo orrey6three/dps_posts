@@ -25,9 +25,22 @@
     --radius-full: 9999px;
     --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.4);
     --shadow-glow: 0 0 40px rgba(244, 63, 94, 0.08);
-    --transition-fast: 0.15s ease;
+    --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Light Theme Tokens */
+[data-theme="light"] {
+    --bg-deep: #f5f5f7;
+    --bg-card: rgba(255, 255, 255, 0.85);
+    --bg-elevated: #ffffff;
+    --text-primary: #1d1d1f;
+    --text-secondary: #86868b;
+    --border-subtle: rgba(0, 0, 0, 0.08);
+    --border-strong: rgba(0, 0, 0, 0.15);
+    --shadow-soft: 0 8px 30px rgba(0,0,0,0.1);
+}
+
 
 * {
     margin: 0;
@@ -705,5 +718,96 @@ body {
 /* Map specific tweaks to accommodate bottom nav */
 .ymaps-2-1-79-controls__control {
     margin-bottom: 80px !important; /* Move map controls up */
+}
+
+/* Delete own post button */
+.btn-delete-own {
+    width: 100%;
+    margin-top: 12px;
+    padding: 11px 16px;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: var(--radius-lg);
+    background: rgba(239, 68, 68, 0.08);
+    color: #f87171;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.btn-delete-own:hover {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.7);
+}
+
+/* Admin shortcut button on the map */
+.admin-map-btn {
+    position: fixed;
+    top: max(16px, env(safe-area-inset-top));
+    left: 16px;
+    z-index: 999;
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    padding: 10px 16px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: none; /* shown only for admin via JS */
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    box-shadow: var(--shadow-soft);
+    transition: all var(--transition-fast);
+}
+.admin-map-btn:hover {
+    background: var(--bg-elevated);
+}
+.admin-map-btn.visible {
+    display: flex;
+}
+
+/* Theme Toggle Button */
+.theme-toggle-btn {
+    position: fixed;
+    top: max(16px, env(safe-area-inset-top));
+    right: 16px;
+    z-index: 10000;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-full);
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: var(--shadow-soft);
+    transition: all var(--transition-fast);
+}
+.theme-toggle-btn:hover {
+    transform: scale(1.05);
+    background: var(--bg-elevated);
+}
+.theme-toggle-btn .sun-icon { display: none; }
+.theme-toggle-btn .moon-icon { display: block; }
+
+[data-theme="light"] .theme-toggle-btn .sun-icon { display: block; }
+[data-theme="light"] .theme-toggle-btn .moon-icon { display: none; }
+
+/* In light mode, map controls need standard shadow instead of dark one */
+[data-theme="light"] .ymaps-2-1-79-button {
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
 }
 
