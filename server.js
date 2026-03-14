@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Middleware
+// Middlewares
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
       ? process.env.FRONTEND_URL
