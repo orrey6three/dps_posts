@@ -7,12 +7,10 @@
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Yandex Maps: REPLACE 'YOUR_API_KEY' with a real key for Geocoding to work -->
-    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=bc901a5b-648b-402f-870a-4a377b21fe44" type="text/javascript"></script>
+    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=e9ae3ad2-3009-485e-8ad9-39f715676b8a" type="text/javascript"></script>
 </head>
 <body>
 
-<!-- Login Screen -->
 <div id="login-screen">
     <div class="login-card">
         <div class="login-logo">
@@ -30,10 +28,8 @@
     </div>
 </div>
 
-<!-- Admin Panel -->
 <div id="admin-panel" class="hidden">
 
-    <!-- Header -->
     <header class="admin-header">
         <div class="admin-header-inner">
             <div class="admin-brand">
@@ -54,7 +50,6 @@
         </div>
     </header>
 
-    <!-- Stats Bar -->
     <div class="stats-bar">
         <div class="stats-bar-inner">
             <div class="stat-card">
@@ -81,7 +76,6 @@
         </div>
     </div>
 
-    <!-- Tabs -->
     <div class="admin-tabs-bar">
         <div class="admin-tabs-inner">
             <button class="admin-tab active" data-tab="posts"><i class="fa-solid fa-location-pin"></i> Метки</button>
@@ -90,7 +84,6 @@
     </div>
 
     <main class="admin-main">
-        <!-- Posts Tab -->
         <div id="tab-posts" class="tab-content active">
             <div class="section-toolbar">
                 <h2 class="section-title">Метки на карте</h2>
@@ -100,7 +93,6 @@
             <div id="posts-list" class="posts-list"></div>
         </div>
 
-        <!-- Users Tab -->
         <div id="tab-users" class="tab-content hidden">
             <div class="section-toolbar">
                 <h2 class="section-title">Пользователи</h2>
@@ -125,7 +117,6 @@
     </main>
 </div>
 
-<!-- Post Modal -->
 <div id="post-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
     <div class="modal-content">
         <div class="modal-header">
@@ -177,7 +168,6 @@
     </div>
 </div>
 
-<!-- Confirm Delete Post Modal -->
 <div id="confirm-delete-modal" class="modal-overlay hidden" aria-hidden="true">
     <div class="modal-content confirm-content" role="dialog" aria-modal="true">
         <div class="modal-header">
