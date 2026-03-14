@@ -528,15 +528,12 @@ class DPSMap {
     }
 
     initRealtime() {
-        // ... omitted unchanged realtime logic
         const supabaseClient = window.supabase.createClient(
-            'https://plfzklrsmasyfibwgwjy.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsZnprbHJzbWFzeWZpYndnd2p5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMTEyNDEsImV4cCI6MjA4Nzc4NzI0MX0.ov_SXuO2vBkAKi0TU9YGbEyShy2LhCnybpO9y6unXuU'
-        );
+    'https://plfzklrsmasyfibwgwjy.supabase.co',
+    'sb_publishable_R2AXul-1rak2qPlfoLLc0Q_O20f_f7y');
 
         this.realtimeChannel = supabaseClient
             .channel('db-changes')
-            // Listen for NEW POSTS
             .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'posts' },
