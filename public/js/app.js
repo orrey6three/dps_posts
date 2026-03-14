@@ -36,6 +36,14 @@ function formatTimeAgo(timestamp) {
 
 function formatYekaterinburgTime(timestamp) {
     if (!timestamp) return '—';
+    return new Date(timestamp).toLocaleString('ru-RU', {
+        timeZone: 'Asia/Yekaterinburg',
+        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+    });
+}
+
+function formatYekaterinburgTime(timestamp) {
+    if (!timestamp) return '—';
     const date = new Date(timestamp);
     
     // Yekaterinburg is UTC+5. 
@@ -73,12 +81,25 @@ class DPSMap {
         this.currentPost = null;
         this.deviceId = getDeviceId();
         this.realtimeChannel = null;
-        
+        this.reputation = {};
+
         this.currentUser = null;
         this.newMarkerCoords = null;
         this.selectedTags = [];
         this.isPlacementMode = false;
         this.markerSize = parseInt(localStorage.getItem('dps45_marker_size')) || 32;
+        this.votedPosts = JSON.parse(localStorage.getItem('dps45_voted_posts') || '[]');
+        this.filters = { type: 'all', freshOnly: false, myVotes: false, heat: false };
+        this.heatmap = null;
+        this.notificationOptions = {
+            enabled: JSON.parse(localStorage.getItem('dps45_notify_enabled') || 'false'),
+            radius: parseInt(localStorage.getItem('dps45_notify_radius') || '1'),
+            quietStart: localStorage.getItem('dps45_quiet_start') || '23:00',
+            quietEnd: localStorage.getItem('dps45_quiet_end') || '07:00',
+            lastSeen: JSON.parse(localStorage.getItem('dps45_notify_seen') || '{}')
+        };
+        this.notifyTimer = null;
+        this.userLocation = null;
         this.CITY_COORDS = {
             shchuchye: [55.2133, 62.7634],
             shumikha: [55.2255, 63.2982],
@@ -96,6 +117,7 @@ class DPSMap {
         await this.loadPosts();
         this.initMap();
         this.initRealtime();
+        this.initNotifications();
     }
     
     initTheme() {
@@ -123,12 +145,6 @@ class DPSMap {
         });
 
         const cityText = document.getElementById('city-selector-text');
-        if (cityText) {
-            const cityName = city === 'shchuchye' ? 'Щучье' : city === 'shumikha' ? 'Шумиха' : 'Мишкино';
-            cityText.textContent = `Ваш город (${cityName})`;
-        }
-
-        // Move map
         if (this.map) {
             this.map.setCenter(this.CITY_COORDS[city], 14, { duration: 1000 });
         }
@@ -344,6 +360,35 @@ class DPSMap {
             document.getElementById('community-drawer').classList.add('active');
         });
 
+        // Filters bar
+        document.querySelectorAll('#filters-bar .filter-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                const filter = chip.getAttribute('data-filter');
+                if (filter === 'heat') {
+                    this.filters.heat = !this.filters.heat;
+                    chip.classList.toggle('active', this.filters.heat);
+                    this.renderMarkers();
+                    return;
+                }
+
+                document.querySelectorAll('#filters-bar .filter-chip').forEach(c => {
+                    if (c.getAttribute('data-filter') !== 'heat') c.classList.remove('active');
+                });
+                chip.classList.add('active');
+
+                this.filters.freshOnly = false;
+                this.filters.myVotes = false;
+                if (filter === 'dps') this.filters.type = 'dps';
+                else if (filter === 'sos') this.filters.type = 'sos';
+                else this.filters.type = 'all';
+
+                if (filter === 'fresh') this.filters.freshOnly = true;
+                if (filter === 'mine') this.filters.myVotes = true;
+
+                this.renderMarkers();
+            });
+        });
+
         // Drawer Close Buttons
         document.querySelectorAll('.drawer-close').forEach(btn => {
             btn.addEventListener('click', () => this.closeAllDrawers());
@@ -432,6 +477,48 @@ class DPSMap {
             }
         });
 
+        // Notifications controls
+        const notifyConfig = document.getElementById('notify-config');
+        const notifyToggle = document.getElementById('notify-toggle');
+        if (notifyToggle) {
+            notifyToggle.addEventListener('click', () => {
+                this.notificationOptions.enabled = !this.notificationOptions.enabled;
+                localStorage.setItem('dps45_notify_enabled', JSON.stringify(this.notificationOptions.enabled));
+                if (notifyConfig) notifyConfig.style.display = this.notificationOptions.enabled ? 'block' : 'none';
+                this.updateNotifyUI();
+                if (this.notificationOptions.enabled) {
+                    this.requestNotificationPermission();
+                    this.startNotifyLoop();
+                } else {
+                    this.stopNotifyLoop();
+                }
+            });
+        }
+
+        document.querySelectorAll('.radius-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.radius-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.notificationOptions.radius = parseInt(btn.getAttribute('data-radius'));
+                localStorage.setItem('dps45_notify_radius', this.notificationOptions.radius);
+                this.updateNotifyUI();
+            });
+        });
+
+        const quietStart = document.getElementById('quiet-start');
+        const quietEnd = document.getElementById('quiet-end');
+        if (quietStart) quietStart.addEventListener('change', (e) => {
+            this.notificationOptions.quietStart = e.target.value;
+            localStorage.setItem('dps45_quiet_start', e.target.value);
+        });
+        if (quietEnd) quietEnd.addEventListener('change', (e) => {
+            this.notificationOptions.quietEnd = e.target.value;
+            localStorage.setItem('dps45_quiet_end', e.target.value);
+        });
+
+        this.updateNotifyUI();
+        if (notifyConfig) notifyConfig.style.display = this.notificationOptions.enabled ? 'block' : 'none';
+
         // Add Post Category Selector
         document.querySelectorAll('.type-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -446,6 +533,18 @@ class DPSMap {
         
         // Setup initial tags
         this.generateTags('ДПС');
+
+        // Quick phrases
+        document.querySelectorAll('.quick-phrase').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const text = btn.getAttribute('data-text');
+                document.getElementById('post-new-comment').value = text;
+            });
+        });
+
+        // Voice dictation
+        const voiceBtn = document.getElementById('btn-voice');
+        if (voiceBtn) voiceBtn.addEventListener('click', () => this.startVoiceInput());
 
         // Add Post Form Submission
         document.getElementById('add-post-form').addEventListener('submit', async (e) => {
@@ -534,6 +633,7 @@ class DPSMap {
             const response = await fetch('/api/posts');
             const data = await response.json();
             this.posts = data.posts;
+            this.buildReputation();
         } catch (error) {
             console.error('Error loading posts:', error);
             this.showError('Не удалось загрузить посты');
@@ -718,48 +818,59 @@ class DPSMap {
     }
 
     renderMarkers() {
-        Object.values(this.markers).forEach(marker => {
-            this.map.geoObjects.remove(marker);
-        });
+        Object.values(this.markers).forEach(marker => this.map.geoObjects.remove(marker));
         this.markers = {};
+        if (this.heatmap) { this.heatmap.setMap(null); this.heatmap = null; }
 
         if (!this.posts || !Array.isArray(this.posts)) return;
 
-        this.posts.forEach(post => {
-            // Logic for active vs inactive (stale or marked as irrelevant)
+        const filtered = this.posts.filter(post => {
+            if (this.filters.type === 'dps' && post.type !== 'ДПС') return false;
+            if (this.filters.type === 'sos' && post.type !== 'Нужна помощь') return false;
+            if (this.filters.freshOnly && isStale(post.last_activity || post.last_relevant || post.created_at)) return false;
+            if (this.filters.myVotes && !this.votedPosts.includes(post.post_id)) return false;
+            return true;
+        });
+
+        if (this.filters.heat) {
+            ymaps.modules.require(['Heatmap'], (Heatmap) => {
+                const heatData = filtered.map(p => ({
+                    coordinates: [p.latitude, p.longitude],
+                    weight: Math.max(1, (p.relevant_count || 0) - (p.irrelevant_count || 0) + 1)
+                }));
+                this.heatmap = new Heatmap(heatData, {
+                    radius: 24,
+                    dissipating: true,
+                    opacity: 0.7,
+                    intensityOfMidpoint: 0.2,
+                    gradient: {
+                        0.1: 'rgba(56,189,248,0.2)',
+                        0.4: 'rgba(56,189,248,0.45)',
+                        0.6: 'rgba(255,180,80,0.65)',
+                        0.8: 'rgba(255,80,80,0.8)',
+                        1.0: 'rgba(255,61,90,0.95)'
+                    }
+                });
+                this.heatmap.setMap(this.map);
+            });
+        }
+
+        filtered.forEach(post => {
             const timeRelevant = post.last_relevant ? new Date(post.last_relevant).getTime() : new Date(post.created_at).getTime();
             const timeIrrelevant = post.last_irrelevant ? new Date(post.last_irrelevant).getTime() : 0;
-            
             const isCurrentlyStale = isStale(timeRelevant);
-            
-            // If it's old, and it's SOS or Clear, skip rendering. 
-            // DPS/Question will stay on map but look "faded" until refresh.
-            if (isCurrentlyStale && (post.type === 'Нужна помощь' || post.type === 'Чисто')) {
-                return;
-            }
+
+            if (isCurrentlyStale && (post.type === 'Нужна помощь' || post.type === 'Чисто')) return;
 
             const isPoPuti = post.comment && post.comment.toLowerCase().includes('попути');
             const emojiStr = isPoPuti ? '❤️' : this.getEmojiByType(post.type);
-            
-            let tagStr = post.tags && post.tags.length > 0 ? `<br><em>${post.tags.map(t => '#'+t).join(' ')}</em>` : '';
-
-            // It is fresh IF:
-            // 1. timeRelevant > timeIrrelevant (The last vote/creation was 'relevant' AND NOT 'irrelevant')
-            // 2. AND it's not stale (6 hours for DPS/Event, 1 hour for SOS/Clear)
+            const tagStr = post.tags && post.tags.length > 0 ? `<br><em>${post.tags.map(t => '#'+t).join(' ')}</em>` : '';
             const isFresh = (timeRelevant > timeIrrelevant) && !isCurrentlyStale;
-            
-            // If stale or marked irrelevant, make it gray and semi-transparent. If fresh, make it bright.
-            // Po puti markers are ALWAYS bright and pulsing
-            const filterStyle = isPoPuti ? 'none' : (isFresh 
-                ? 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' 
-                : 'grayscale(100%) opacity(0.4)');
-
+            const filterStyle = isPoPuti ? 'none' : (isFresh ? 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' : 'grayscale(100%) opacity(0.4)');
             const markerClass = isPoPuti ? 'marker-heart' : '';
-
             const sizeValue = this.markerSize;
             const halfSize = sizeValue / 2;
 
-            // Create a custom HTML layout for the marker
             const CustomIconLayout = ymaps.templateLayoutFactory.createClass(
                 `<div class="${markerClass}" style="font-size: ${sizeValue}px; line-height: ${sizeValue}px; transform: translate(-50%, -50%); cursor: pointer; filter: ${filterStyle}; transition: all 0.3s ease;">
                     ${emojiStr}
@@ -774,8 +885,6 @@ class DPSMap {
                 },
                 {
                     iconLayout: CustomIconLayout,
-                    // The icon size and offset are handled primarily by the CSS transform above,
-                    // but we set a shape to ensure clicks register correctly on the emoji bounding box.
                     iconShape: {
                         type: 'Rectangle',
                         coordinates: [
@@ -788,8 +897,7 @@ class DPSMap {
 
             placemark.events.add('click', (e) => {
                 e.preventDefault();
-                e.stopPropagation(); 
-                
+                e.stopPropagation();
                 if (isPoPuti) {
                     confetti({
                         particleCount: 150,
@@ -798,7 +906,6 @@ class DPSMap {
                         colors: ['#ff416c', '#ff4b2b', '#ffffff']
                     });
                 }
-
                 this.showPostDetails(post);
             });
 
@@ -828,6 +935,11 @@ class DPSMap {
         const typeBadge = document.getElementById('post-type-badge');
         typeBadge.textContent = post.type || 'ДПС';
         typeBadge.className = `post-type-badge ${this.getTypeClass(post.type)}`;
+
+        const trusted = this.isTrustedUser(post);
+        if (trusted) {
+            typeBadge.innerHTML = `${typeBadge.textContent} <span class="trust-dot">Проверено</span>`;
+        }
         
         // Author will be updated in updateBottomSheetTimes
         
@@ -915,6 +1027,10 @@ class DPSMap {
             if (response.ok) {
                 this.showMessage('success', data.message || 'Голос принят!');
                 this.showSuccess('Голос принят');
+                if (!this.votedPosts.includes(this.currentPost.post_id)) {
+                    this.votedPosts.push(this.currentPost.post_id);
+                    localStorage.setItem('dps45_voted_posts', JSON.stringify(this.votedPosts));
+                }
                 await this.loadPosts();
                 this.renderMarkers();
                 const updatedPost = this.posts.find(p => p.post_id === this.currentPost.post_id);
@@ -1089,6 +1205,150 @@ class DPSMap {
         
         this.isPlacementMode = false;
         document.getElementById('map').classList.remove('placement-active');
+    }
+
+    startVoiceInput() {
+        const statusEl = document.getElementById('voice-status');
+        const commentEl = document.getElementById('post-new-comment');
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            this.showError('Диктовка не поддерживается');
+            return;
+        }
+        const sr = new SpeechRecognition();
+        sr.lang = 'ru-RU';
+        sr.continuous = false;
+        sr.interimResults = false;
+        if (statusEl) statusEl.textContent = 'Слушаю...';
+        sr.start();
+        sr.onresult = (e) => {
+            const text = e.results[0][0].transcript;
+            if (commentEl) commentEl.value = text;
+            if (statusEl) statusEl.textContent = 'Готов';
+        };
+        sr.onerror = () => { if (statusEl) statusEl.textContent = 'Ошибка'; };
+        sr.onend = () => { if (statusEl) statusEl.textContent = 'Готов'; };
+    }
+
+    buildReputation() {
+        const rep = {};
+        (this.posts || []).forEach(p => {
+            if (!p.user_id) return;
+            if (!rep[p.user_id]) rep[p.user_id] = { relevant: 0, irrelevant: 0 };
+            rep[p.user_id].relevant += Number(p.relevant_count || 0);
+            rep[p.user_id].irrelevant += Number(p.irrelevant_count || 0);
+        });
+        Object.keys(rep).forEach(id => {
+            const r = rep[id];
+            const total = r.relevant + r.irrelevant;
+            r.total = total;
+            r.accuracy = total ? Math.round((r.relevant / total) * 100) : 0;
+        });
+        this.reputation = rep;
+    }
+
+    isTrustedUser(post) {
+        if (!post.user_id || !this.reputation[post.user_id]) return false;
+        const r = this.reputation[post.user_id];
+        return r.total >= 5 && r.accuracy >= 70;
+    }
+
+    updateNotifyUI() {
+        const status = document.getElementById('notify-status');
+        const sub = document.getElementById('notify-sub');
+        if (status) status.textContent = this.notificationOptions.enabled ? 'Вкл' : 'Выкл';
+        if (sub) sub.textContent = `Радиус ${this.notificationOptions.radius} км`;
+        document.querySelectorAll('.radius-btn').forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.getAttribute('data-radius')) === this.notificationOptions.radius);
+        });
+        const cfg = document.getElementById('notify-config');
+        if (cfg) cfg.style.display = this.notificationOptions.enabled ? 'block' : 'none';
+    }
+
+    initNotifications() {
+        if (this.notificationOptions.enabled) {
+            this.requestNotificationPermission();
+            this.startNotifyLoop();
+        }
+    }
+
+    requestNotificationPermission() {
+        if (!('Notification' in window)) {
+            this.showError('Ваш браузер не поддерживает уведомления');
+            return;
+        }
+        if (Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    }
+
+    startNotifyLoop() {
+        if (this.notifyTimer) clearInterval(this.notifyTimer);
+        this.fetchUserLocation();
+        this.notifyTimer = setInterval(() => this.checkNearbyNotifications(), 60000);
+        this.checkNearbyNotifications();
+    }
+
+    stopNotifyLoop() {
+        if (this.notifyTimer) clearInterval(this.notifyTimer);
+        this.notifyTimer = null;
+    }
+
+    fetchUserLocation() {
+        ymaps.geolocation.get({ provider: 'browser', autoReverseGeocode: false }).then(res => {
+            this.userLocation = res.geoObjects.get(0).geometry.getCoordinates();
+        }).catch(() => {
+            ymaps.geolocation.get({ provider: 'yandex', autoReverseGeocode: false }).then(r => {
+                this.userLocation = r.geoObjects.get(0).geometry.getCoordinates();
+            });
+        });
+    }
+
+    withinQuietHours() {
+        const now = new Date();
+        const [qsH, qsM] = this.notificationOptions.quietStart.split(':').map(Number);
+        const [qeH, qeM] = this.notificationOptions.quietEnd.split(':').map(Number);
+        const start = new Date(now); start.setHours(qsH, qsM, 0, 0);
+        const end = new Date(now); end.setHours(qeH, qeM, 0, 0);
+        if (end < start) {
+            // crosses midnight
+            return now >= start || now <= end;
+        }
+        return now >= start && now <= end;
+    }
+
+    checkNearbyNotifications() {
+        if (!this.notificationOptions.enabled) return;
+        if (!this.userLocation) return;
+        if (Notification.permission !== 'granted') return;
+        if (this.withinQuietHours()) return;
+
+        const radiusM = this.notificationOptions.radius * 1000;
+        const seen = this.notificationOptions.lastSeen || {};
+
+        (this.posts || []).forEach(post => {
+            if (!(post.type === 'ДПС' || post.type === 'Нужна помощь')) return;
+            if (seen[post.post_id]) return;
+            const dist = this.haversine(this.userLocation, [post.latitude, post.longitude]);
+            if (dist <= radiusM) {
+                new Notification(`${post.type} рядом`, { body: post.address || 'Новая метка поблизости' });
+                seen[post.post_id] = Date.now();
+            }
+        });
+
+        this.notificationOptions.lastSeen = seen;
+        localStorage.setItem('dps45_notify_seen', JSON.stringify(seen));
+    }
+
+    haversine(a, b) {
+        const toRad = (v) => v * Math.PI / 180;
+        const R = 6371000;
+        const dLat = toRad(b[0] - a[0]);
+        const dLon = toRad(b[1] - a[1]);
+        const lat1 = toRad(a[0]);
+        const lat2 = toRad(b[0]);
+        const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(h));
     }
 }
 
