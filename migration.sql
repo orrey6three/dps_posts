@@ -66,27 +66,7 @@ VALUES (
     'admin'
 ) ON CONFLICT (username) DO NOTHING;
 
--- Insert sample posts for Шумиха, Курганская область, owned by the Admin user
-INSERT INTO posts (id, title, address, latitude, longitude, type, created_at, user_id) 
-SELECT id, title, address, latitude, longitude, 'ДПС', created_at, uuid_generate_v5(uuid_ns_url(), 'admin@dps45.local') 
-FROM (VALUES 
-    ('10e19406-60fb-4810-b3ae-c1fffe09b099'::uuid, 'Пост ДПС - Квартал Новостроек', 'район Новостроек', 55.237829, 63.314954, '2026-03-01 13:32:44.900874+00'::timestamptz),
-    ('1402da71-b96b-46e9-8cec-7d6e9026d569'::uuid, 'Пост ДПС - Мир Света', 'Шумиха, район Мир Света', 55.227346, 63.294359, '2026-03-01 13:32:44.900874+00'::timestamptz),
-    ('14542369-07fa-4ae3-b770-c841aa107330'::uuid, 'Пост ДПС - Советская/Гоголя', 'перекресток Советская и Гоголя', 55.234348, 63.286332, '2026-03-01 13:32:44.900874+00'::timestamptz),
-    ('236973b0-dcde-4f08-9d41-9a40d735bd3f'::uuid, 'Гостиница', NULL, 55.227313, 63.282989, '2026-03-12 19:30:14.084211+00'::timestamptz),
-    ('2755d2e3-5b77-4afd-8128-c9c0aacd29c5'::uuid, 'Пожарка на Гагарина', NULL, 55.225651, 63.284144, '2026-03-12 19:25:38.432371+00'::timestamptz),
-    ('3e11a4cc-91f4-4c7f-a738-5368d00aa4d6'::uuid, 'Пост ДПС - Победы/Молодёжи', 'перекресток Победы и Молодёжи', 55.235038, 63.305525, '2026-03-01 13:32:44.900874+00'::timestamptz),
-    ('42a27d7f-6fd6-4ca6-92d8-0eda5c494147'::uuid, 'Пост ДПС - Отдел', 'Шумиха, район Отдела', 55.225186, 63.2856, '2026-03-01 13:32:44.900874+00'::timestamptz),
-    ('6d507990-99f1-491d-bd29-cc51f5f6f55e'::uuid, 'Пост ДПС - Начало Каменской', 'улица Каменская', 55.240094, 63.272624, '2026-03-01 13:32:44.900874+00'::timestamptz),
-    ('8c6d036d-17b3-41a7-b029-4f7e5b1171c0'::uuid, 'Малое Дюрягино', NULL, 55.201401, 63.246736, '2026-03-12 19:17:58.772522+00'::timestamptz),
-    ('a4b1de9b-8cb4-49af-8c58-6f7f1611b9db'::uuid, 'Пост ДПС - Виадук', 'Шумиха, район Виадука', 55.216072, 63.267471, '2026-03-01 13:32:44.900874+00'::timestamptz),
-    ('b3b50614-8d97-4c08-9f93-a963ded9f8e7'::uuid, 'Пост ДПС - Монетка Белоносова', 'у магазина Монетка (Белоносова)', 55.230139, 63.299014, '2026-03-01 13:32:44.900874+00'::timestamptz),
-    ('c82558b7-06eb-4f4c-805f-cc58fc9b47b4'::uuid, 'Пост ДПС - Угол Ленина/Гоголя', 'Перекресток Ленина и Гоголя', 55.228378, 63.298967, '2026-03-01 13:32:44.900874+00'::timestamptz),
-    ('df75f85f-9867-4a10-b999-de9642dfbdd4'::uuid, 'Подъём Виадук ( перекрестие улиц )', NULL, 55.221616, 63.264218, '2026-03-12 19:46:08.404074+00'::timestamptz),
-    ('dfe3a558-d418-4c20-a84e-eb49610d9b1b'::uuid, 'Пост ДПС - Кольцо', 'Шумихинское кольцо', 55.254677, 63.253482, '2026-03-01 13:32:44.900874+00'::timestamptz),
-    ('fa54438a-3ee2-4653-ae42-fec4b4c9bfa3'::uuid, 'Спартака - Олохова ( напротив Продсервиса )', NULL, 55.233509, 63.273488, '2026-03-12 19:43:51.25716+00'::timestamptz)
-) AS default_posts(id, title, address, latitude, longitude, created_at)
-ON CONFLICT (id) DO NOTHING;
+-- Default sample markers removed to allow community-driven population
 
 -- Enable Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -108,6 +88,10 @@ ON votes FOR SELECT USING (true);
 -- Allow anyone to insert votes
 CREATE POLICY "Anyone can vote" 
 ON votes FOR INSERT WITH CHECK (true);
+
+-- Enable Realtime for posts and votes
+ALTER PUBLICATION supabase_realtime ADD TABLE posts;
+ALTER PUBLICATION supabase_realtime ADD TABLE votes;
 
 -- Create a function to get post statistics
 DROP FUNCTION IF EXISTS get_post_stats();

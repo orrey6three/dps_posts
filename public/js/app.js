@@ -34,20 +34,14 @@ function formatTimeAgo(timestamp) {
     return `${diffDays} дн. назад`;
 }
 
-function isStale(timestamp, type) {
+function isStale(timestamp) {
     if (!timestamp) return true;
     const now = Date.now();
     const postTime = new Date(timestamp).getTime();
     
-    // 1 hour for SOS and Clear
-    if (type === 'Нужна помощь' || type === 'Чисто') {
-        const oneHourAgo = now - 1 * 60 * 60 * 1000;
-        return postTime < oneHourAgo;
-    }
-    
-    // 6 hours for others
-    const sixHoursAgo = now - 6 * 60 * 60 * 1000;
-    return postTime < sixHoursAgo;
+    // Strict 1 hour lifecycle for ALL markers
+    const oneHourAgo = now - 1 * 60 * 60 * 1000;
+    return postTime < oneHourAgo;
 }
 const HASHTAGS_MAP = {
     'ДПС': ['Одинокий', 'ДвеПалки', 'ТриПалки', 'ВсехПодряд', 'ТехКонтроль', 'Тонировка', 'Пешеходы', 'СвежееДыхание', 'Страховка', 'вОбеСтороны', 'МотоБат', 'Приставы', 'Регулировщик', 'Медичка', 'Много'],
@@ -533,7 +527,26 @@ class DPSMap {
         );
 
         this.realtimeChannel = supabaseClient
-            .channel('votes-realtime')
+            .channel('db-changes')
+            // Listen for NEW POSTS
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'posts' },
+                async () => {
+                    await this.loadPosts();
+                    this.renderMarkers();
+                }
+            )
+            // Listen for DELETED POSTS
+            .on(
+                'postgres_changes',
+                { event: 'DELETE', schema: 'public', table: 'posts' },
+                async () => {
+                    await this.loadPosts();
+                    this.renderMarkers();
+                }
+            )
+            // Listen for NEW VOTES
             .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'votes' },
@@ -550,7 +563,11 @@ class DPSMap {
                     }
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('Realtime sync active: posts & votes');
+                }
+            });
     }
 
     updateBottomSheetTimes(post) {
@@ -677,11 +694,12 @@ class DPSMap {
             const timeRelevant = post.last_relevant ? new Date(post.last_relevant).getTime() : new Date(post.created_at).getTime();
             const timeIrrelevant = post.last_irrelevant ? new Date(post.last_irrelevant).getTime() : 0;
             
-            const isCurrentlyStale = isStale(timeRelevant, post.type);
+            const isCurrentlyStale = isStale(timeRelevant);
             
-            // If it's a Help or Clear marker, and it's older than 1 hour, DO NOT render it at all
+            // If it's old, and it's SOS or Clear, skip rendering. 
+            // DPS/Question will stay on map but look "faded" until refresh.
             if (isCurrentlyStale && (post.type === 'Нужна помощь' || post.type === 'Чисто')) {
-                return; // skip this iteration, so marker is removed
+                return;
             }
 
             const emojiStr = this.getEmojiByType(post.type);
