@@ -7,38 +7,22 @@
     <title>DPS45 - Знай, где стоят</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <meta name="description" content="Народная карта постов ДПС в Шумихе, Курганская область">
-    
-    <!-- Yandex Maps -->
-    <!-- Yandex Maps: REPLACE 'YOUR_API_KEY' with a real key for Geocoding to work -->
-    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=bc901a5b-648b-402f-870a-4a377b21fe44" type="text/javascript"></script>
-    <!-- Supabase -->
+    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=e9ae3ad2-3009-485e-8ad9-39f715676b8a" type="text/javascript"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <!-- FontAwesome (for icons) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Confetti for Easter Egg -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <!-- Fullscreen Map Container -->
     <div id="map"></div>
-
-    <!-- Admin shortcut (only visible to admin users) -->
     <a href="/admin" class="admin-map-btn" id="admin-map-btn" title="Админ панель">
         <i class="fa-solid fa-shield-halved"></i> Админ
     </a>
-
-
-
-    <!-- Loading Screen -->
     <div id="loading" class="loading-overlay">
         <div class="loading-spinner"></div>
         <p>Загрузка карты...</p>
     </div>
-
-    <!-- Marker Details Bottom Sheet (Drawer) -->
     <div id="bottom-sheet" class="bottom-sheet">
         <div class="bottom-sheet-handle"></div>
         <div id="post-details" class="post-details">
@@ -54,7 +38,6 @@
             <p id="post-address" class="address-text" style="display: none;"></p>
             
             <div id="post-tags-container" class="tags-container">
-                <!-- Tags will be injected here -->
             </div>
 
             <div class="post-comment" id="post-comment-container" style="display: none;">
@@ -85,7 +68,6 @@
         </div>
     </div>
 
-    <!-- Add Post Drawer (Full Screen Modal style) -->
     <div id="add-post-drawer" class="drawer-modal">
         <div class="drawer-header">
             <button class="drawer-close" id="btn-close-add">
@@ -107,7 +89,6 @@
                 <div class="form-group">
                     <label class="form-label text-muted">Быстрые теги:</label>
                     <div id="tags-selector" class="tags-selector">
-                        <!-- Javascript will populate tags here depending on the type -->
                     </div>
                 </div>
 
@@ -121,7 +102,6 @@
         </div>
     </div>
 
-    <!-- Settings/Profile Drawer -->
     <div id="settings-drawer" class="drawer-modal">
         <div class="drawer-header">
             <button class="drawer-close" id="btn-close-settings">
@@ -131,7 +111,6 @@
         </div>
         <div class="drawer-content">
             
-            <!-- Authentication / Profile (ALWAYS TOP) -->
             <div id="auth-section" class="auth-section">
                 <p class="text-secondary mb-4">Войдите, чтобы добавлять метки и участвовать в жизни сообщества.</p>
                 <div class="auth-tabs">
@@ -139,7 +118,6 @@
                     <button class="auth-tab" data-tab="register">Регистрация</button>
                 </div>
                 
-                <!-- Login Form -->
                 <form id="login-form" class="auth-form active-form">
                     <div class="form-group">
                         <input type="text" id="login-username" placeholder="Имя пользователя" required>
@@ -150,7 +128,6 @@
                     <button type="submit" class="btn btn-primary btn-full mb-3">Войти</button>
                 </form>
 
-                <!-- Register Form -->
                 <form id="register-form" class="auth-form" style="display:none;">
                     <div class="form-group">
                         <input type="text" id="register-username" placeholder="Придумайте никнейм" required>
@@ -162,7 +139,6 @@
                 </form>
             </div>
 
-            <!-- When Logged In -->
             <div id="profile-section" class="profile-section" style="display: none;">
                 <div class="profile-card mb-4">
                     <div class="profile-avatar"><i class="fa-solid fa-user"></i></div>
@@ -185,9 +161,6 @@
                 </div>
             </div>
 
-
-
-            <!-- Common Settings (BOTTOM) -->
             <div class="settings-list mb-4">
                 <div class="settings-item">
                     <div class="settings-info">
@@ -234,8 +207,6 @@
         </div>
     </div>
 
-
-    <!-- Bottom Navigation Bar -->
     <nav class="bottom-nav">
         <a href="#" class="nav-item active" id="nav-map">
             <i class="fa-solid fa-map-location-dot"></i>
@@ -251,11 +222,7 @@
             <span>Настройки</span>
         </a>
     </nav>
-
-    <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
-
-    <!-- Confirmation Modal -->
     <div id="confirm-modal" class="confirm-modal">
         <div class="confirm-content">
             <h3 id="confirm-title">Подтверждение</h3>
@@ -266,8 +233,6 @@
             </div>
         </div>
     </div>
-
-    <!-- City Selection Modal -->
     <div id="city-modal" class="modal-overlay">
         <div class="city-selection-card">
             <h2>Выберите ваш город</h2>
@@ -279,8 +244,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Overlay for drawers -->
     <div id="drawer-overlay" class="modal-overlay"></div>
 
     <script src="./js/app.js"></script>
