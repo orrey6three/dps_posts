@@ -157,18 +157,17 @@ BEGIN
         MAX(v.created_at) as last_activity,
         COUNT(CASE WHEN v.vote_type = 'relevant' THEN 1 END) as relevant_count,
         COUNT(CASE WHEN v.vote_type = 'irrelevant' THEN 1 END) as irrelevant_count,
-        (
-            SELECT vu.username 
-            FROM users vu 
-            WHERE vu.id::text = lv.device_id 
-               OR vu.username = lv.device_id -- fallback if device_id was stored as username
-            LIMIT 1
-        ) as last_voter_username
+        MAX(vu.username) as last_voter_username
     FROM posts p
     LEFT JOIN votes v ON p.id = v.post_id
     LEFT JOIN users u ON p.user_id = u.id
-    LEFT JOIN last_votes lv ON p.id = lv.post_id
-    GROUP BY p.id, p.title, p.address, p.latitude, p.longitude, p.type, p.comment, p.tags, p.user_id, u.username, p.created_at, lv.device_id
-    ORDER BY p.title;
+    LEFT JOIN (
+        SELECT DISTINCT ON (post_id) post_id, device_id
+        FROM votes
+        ORDER BY post_id, created_at DESC
+    ) last_v ON p.id = last_v.post_id
+    LEFT JOIN users vu ON (vu.id::text = last_v.device_id OR vu.username = last_v.device_id)
+    GROUP BY p.id, p.title, p.address, p.latitude, p.longitude, p.type, p.comment, p.tags, p.user_id, u.username, p.created_at
+    ORDER BY p.created_at DESC;
 END;
 $$ LANGUAGE plpgsql;

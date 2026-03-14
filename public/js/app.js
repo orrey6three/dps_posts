@@ -116,7 +116,7 @@ class DPSMap {
 
         const cityText = document.getElementById('city-selector-text');
         if (cityText) {
-            const cityName = city === 'schuchye' ? 'Щучье' : city === 'shumikha' ? 'Шумиха' : 'Мишкино';
+            const cityName = city === 'shchuchye' ? 'Щучье' : city === 'shumikha' ? 'Шумиха' : 'Мишкино';
             cityText.textContent = `Ваш город (${cityName})`;
         }
 
@@ -126,7 +126,7 @@ class DPSMap {
         }
 
         if (notify) {
-            const cityName = city === 'schuchye' ? 'Щучье' : city === 'shumikha' ? 'Шумиха' : 'Мишкино';
+            const cityName = city === 'shchuchye' ? 'Щучье' : city === 'shumikha' ? 'Шумиха' : 'Мишкино';
             this.showSuccess(`Выбран город: ${cityName}`);
         }
     }
@@ -228,6 +228,7 @@ class DPSMap {
                 // Fix: Sync deviceId with userId for registered users
                 if (data.user && data.user.id) {
                     this.deviceId = data.user.id;
+                    localStorage.setItem('dps45_device_id', data.user.id);
                 }
                 this.updateAuthUI();
                 this.showSuccess(`С возвращением, ${this.currentUser.username}!`);
@@ -368,7 +369,10 @@ class DPSMap {
                 
                 if (response.ok) {
                     this.currentUser = data.user;
-                    if (data.user && data.user.id) this.deviceId = data.user.id;
+                    if (data.user && data.user.id) {
+                        this.deviceId = data.user.id;
+                        localStorage.setItem('dps45_device_id', data.user.id);
+                    }
                     this.updateAuthUI();
                     this.showSuccess('Вы успешно вошли в систему');
                     document.getElementById('login-form').reset();
@@ -396,7 +400,10 @@ class DPSMap {
                 
                 if (response.ok) {
                     this.currentUser = data.user;
-                    if (data.user && data.user.id) this.deviceId = data.user.id;
+                    if (data.user && data.user.id) {
+                        this.deviceId = data.user.id;
+                        localStorage.setItem('dps45_device_id', data.user.id);
+                    }
                     this.updateAuthUI();
                     this.showSuccess('Аккаунт успешно создан!');
                     document.getElementById('register-form').reset();
@@ -591,10 +598,10 @@ class DPSMap {
                 maxZoom: 18
             });
 
+            this.initCitySelector();
+
             if (!savedCity) {
                 this.showCityModal(this.CITY_COORDS);
-            } else {
-                this.initCitySelector();
             }
 
             this.renderMarkers();

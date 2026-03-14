@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'dps45-static-v30';
-const RUNTIME_CACHE = 'dps45-runtime-v30';
+const STATIC_CACHE = 'dps45-static-v33';
+const RUNTIME_CACHE = 'dps45-runtime-v33';
 
 // Keep this list small to avoid delaying first load.
 const PRECACHE_URLS = [
