@@ -102,6 +102,8 @@ CREATE POLICY "Anyone can vote"
 ON votes FOR INSERT WITH CHECK (true);
 
 -- Create a function to get post statistics
+DROP FUNCTION IF EXISTS get_post_stats();
+
 CREATE OR REPLACE FUNCTION get_post_stats()
 RETURNS TABLE (
     post_id UUID,
@@ -114,6 +116,7 @@ RETURNS TABLE (
     tags TEXT[],
     user_id UUID,
     username TEXT,
+    created_at TIMESTAMP WITH TIME ZONE,
     last_relevant TIMESTAMP WITH TIME ZONE,
     last_irrelevant TIMESTAMP WITH TIME ZONE,
     last_activity TIMESTAMP WITH TIME ZONE,
@@ -133,6 +136,7 @@ BEGIN
         p.tags,
         p.user_id,
         u.username,
+        p.created_at,
         MAX(CASE WHEN v.vote_type = 'relevant' THEN v.created_at END) as last_relevant,
         MAX(CASE WHEN v.vote_type = 'irrelevant' THEN v.created_at END) as last_irrelevant,
         MAX(v.created_at) as last_activity,
@@ -141,7 +145,7 @@ BEGIN
     FROM posts p
     LEFT JOIN votes v ON p.id = v.post_id
     LEFT JOIN users u ON p.user_id = u.id
-    GROUP BY p.id, p.title, p.address, p.latitude, p.longitude, p.type, p.comment, p.tags, p.user_id, u.username
+    GROUP BY p.id, p.title, p.address, p.latitude, p.longitude, p.type, p.comment, p.tags, p.user_id, u.username, p.created_at
     ORDER BY p.title;
 END;
 $$ LANGUAGE plpgsql;

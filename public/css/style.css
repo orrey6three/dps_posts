@@ -99,14 +99,15 @@ body {
 .bottom-sheet {
     position: fixed;
     bottom: 0;
-    left: 0;
-    right: 0;
+    left: 50%;
+    transform: translate(-50%, 100%);
+    width: 100%;
+    max-width: 500px;
     background: var(--bg-card);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     padding: 12px 20px 90px;
-    transform: translateY(100%);
     transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
     z-index: 999;
     box-shadow: var(--shadow-soft);
@@ -117,7 +118,7 @@ body {
 }
 
 .bottom-sheet.active {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
 }
 
 .bottom-sheet-handle {
@@ -476,12 +477,13 @@ body {
     position: fixed;
     top: 5vh;
     bottom: 0;
-    left: 0;
-    right: 0;
+    left: 50%;
+    transform: translate(-50%, 100%);
+    width: 100%;
+    max-width: 500px;
     background: var(--bg-deep);
     z-index: 10001;
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    transform: translateY(100%);
     transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
     display: flex;
     flex-direction: column;
@@ -489,7 +491,7 @@ body {
 }
 
 .drawer-modal.active {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
 }
 
 .drawer-header {

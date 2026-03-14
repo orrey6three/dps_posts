@@ -34,13 +34,21 @@ function formatTimeAgo(timestamp) {
     return `${diffDays} дн. назад`;
 }
 
-function isStale(timestamp) {
+function isStale(timestamp, type) {
     if (!timestamp) return true;
-    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
-    return new Date(timestamp) < sixHoursAgo;
+    const now = Date.now();
+    const postTime = new Date(timestamp).getTime();
+    
+    // 1 hour for SOS and Clear
+    if (type === 'Нужна помощь' || type === 'Чисто') {
+        const oneHourAgo = now - 1 * 60 * 60 * 1000;
+        return postTime < oneHourAgo;
+    }
+    
+    // 6 hours for others
+    const sixHoursAgo = now - 6 * 60 * 60 * 1000;
+    return postTime < sixHoursAgo;
 }
-
-// Hashtags mapping per category
 const HASHTAGS_MAP = {
     'ДПС': ['Одинокий', 'ДвеПалки', 'ТриПалки', 'ВсехПодряд', 'ТехКонтроль', 'Тонировка', 'Пешеходы', 'СвежееДыхание', 'Страховка', 'вОбеСтороны', 'МотоБат', 'Приставы', 'Регулировщик', 'Медичка', 'Много'],
     'Нужна помощь': ['Прикурите', 'Обсох', 'ВозьмитеНаТрос', 'ПроводаЕсть', 'ПроводаНет', 'НуженКомпрессор', 'НуженДомкрат'],
@@ -445,20 +453,54 @@ class DPSMap {
         this.markers = {};
 
         this.posts.forEach(post => {
-            const markerPreset = this.getMarkerPresetByType(post.type);
-            const iconContent = this.getIconContentByType(post.type);
+            // Logic for active vs inactive (stale or marked as irrelevant)
+            const timeRelevant = post.last_relevant ? new Date(post.last_relevant).getTime() : new Date(post.created_at).getTime();
+            const timeIrrelevant = post.last_irrelevant ? new Date(post.last_irrelevant).getTime() : 0;
+            
+            const isCurrentlyStale = isStale(timeRelevant, post.type);
+            
+            // If it's a Help or Clear marker, and it's older than 1 hour, DO NOT render it at all
+            if (isCurrentlyStale && (post.type === 'Нужна помощь' || post.type === 'Чисто')) {
+                return; // skip this iteration, so marker is removed
+            }
+
+            const emojiStr = this.getEmojiByType(post.type);
             
             let tagStr = post.tags && post.tags.length > 0 ? `<br><em>${post.tags.map(t => '#'+t).join(' ')}</em>` : '';
+
+            // It is fresh IF:
+            // 1. timeRelevant > timeIrrelevant (The last vote/creation was 'relevant' AND NOT 'irrelevant')
+            // 2. AND it's not stale (6 hours for DPS/Event, 1 hour for SOS/Clear)
+            const isFresh = (timeRelevant > timeIrrelevant) && !isCurrentlyStale;
+            
+            // If stale or marked irrelevant, make it gray and semi-transparent. If fresh, make it bright.
+            const filterStyle = isFresh 
+                ? 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' 
+                : 'grayscale(100%) opacity(0.4)';
+
+            // Create a custom HTML layout for the marker
+            const CustomIconLayout = ymaps.templateLayoutFactory.createClass(
+                `<div style="font-size: 32px; line-height: 32px; transform: translate(-50%, -50%); cursor: pointer; filter: ${filterStyle}; transition: filter 0.3s ease;">
+                    ${emojiStr}
+                </div>`
+            );
 
             const placemark = new ymaps.Placemark(
                 [post.latitude, post.longitude],
                 {
                     hintContent: post.type || 'ДПС',
                     balloonContent: `<strong>${post.type || 'ДПС'}</strong><br>${post.comment || ''}${tagStr}`,
-                    iconContent: iconContent
                 },
                 {
-                    preset: markerPreset,
+                    iconLayout: CustomIconLayout,
+                    // The icon size and offset are handled primarily by the CSS transform above,
+                    // but we set a shape to ensure clicks register correctly on the emoji bounding box.
+                    iconShape: {
+                        type: 'Rectangle',
+                        coordinates: [
+                            [-16, -16], [16, 16]
+                        ]
+                    },
                     hideIconOnBalloonOpen: false
                 }
             );
@@ -474,18 +516,11 @@ class DPSMap {
         });
     }
 
-    getMarkerPresetByType(type) {
-        if (type === 'Нужна помощь') return 'islands#orangeStretchyIcon';
-        if (type === 'Чисто') return 'islands#greenStretchyIcon';
-        if (type === 'Вопрос') return 'islands#lightBlueStretchyIcon';
-        return 'islands#redStretchyIcon'; // ДПС
-    }
-
-    getIconContentByType(type) {
-        if (type === 'Нужна помощь') return '🆘 SOS';
-        if (type === 'Чисто') return '✅ Чисто';
-        if (type === 'Вопрос') return '⚠️ Событие';
-        return '🚔 ДПС'; // ДПС
+    getEmojiByType(type) {
+        if (type === 'Нужна помощь') return '🆘';
+        if (type === 'Чисто') return '✅';
+        if (type === 'Вопрос') return '⚠️';
+        return '🚔'; // ДПС
     }
 
     getTypeClass(type) {
