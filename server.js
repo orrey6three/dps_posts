@@ -4,8 +4,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import apiRoutes from './routes/api.js';
-import adminRoutes from './routes/admin.js';
+
+import authRoutes from './routes/auth.routes.js';
+import postRoutes from './routes/post.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 
 dotenv.config();
 
@@ -30,8 +32,9 @@ const publicPath = path.join(__dirname, 'public');
 app.use(express.static(publicPath));
 
 // API Routes
-app.use('/api', apiRoutes);
-app.use('/admin', adminRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api', postRoutes);
+app.use('/admin/api', adminRoutes);
 
 // Serve admin page
 app.get('/admin', (req, res) => {

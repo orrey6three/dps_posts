@@ -39,7 +39,7 @@ class AdminPanel {
 
     async checkAuth() {
         try {
-            const response = await fetch('/admin/verify', { credentials: 'include' });
+            const response = await fetch('/admin/api/verify', { credentials: 'include' });
             if (response.ok) {
                 this.showAdminPanel();
                 await this.loadPosts();
@@ -230,7 +230,7 @@ class AdminPanel {
         const loadingDiv = document.getElementById('admin-loading');
         loadingDiv.classList.remove('hidden');
         try {
-            const response = await fetch('/admin/posts', { credentials: 'include' });
+            const response = await fetch('/admin/api/posts', { credentials: 'include' });
             const data = await response.json();
             this.posts = data.posts;
             this.renderPosts();
@@ -281,11 +281,11 @@ class AdminPanel {
         const password = document.getElementById('password-input').value;
         const errorDiv = document.getElementById('login-error');
         try {
-            const response = await fetch('/admin/login', {
+            const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ password })
+                body: JSON.stringify({ username: 'admin', password })
             });
             if (response.ok) { this.showAdminPanel(); await this.loadPosts(); }
             else { errorDiv.textContent = 'Неверный пароль'; errorDiv.classList.remove('hidden'); }
@@ -293,7 +293,7 @@ class AdminPanel {
     }
 
     async handleLogout() {
-        await fetch('/admin/logout', { method: 'POST', credentials: 'include' });
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
         this.showLoginScreen();
     }
 
@@ -307,7 +307,7 @@ class AdminPanel {
             longitude: parseFloat(document.getElementById('post-longitude').value)
         };
         const method = postId ? 'PUT' : 'POST';
-        const url = postId ? `/admin/posts/${postId}` : '/admin/posts';
+        const url = postId ? `/admin/api/posts/${postId}` : '/admin/api/posts';
         const response = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
@@ -329,7 +329,7 @@ class AdminPanel {
     }
 
     async deletePost(postId, title) {
-        const res = await fetch(`/admin/posts/${postId}`, { method: 'DELETE', credentials: 'include' });
+        const res = await fetch(`/admin/api/posts/${postId}`, { method: 'DELETE', credentials: 'include' });
         if (res.ok) {
             await this.loadPosts();
             this.showToast('success', 'Пост удалён');

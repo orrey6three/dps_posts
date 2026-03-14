@@ -40,6 +40,14 @@ function isStale(timestamp) {
     return new Date(timestamp) < sixHoursAgo;
 }
 
+// Hashtags mapping per category
+const HASHTAGS_MAP = {
+    'ДПС': ['Одинокий', 'ДвеПалки', 'ТриПалки', 'ВсехПодряд', 'ТехКонтроль', 'Тонировка', 'Пешеходы', 'СвежееДыхание', 'Страховка', 'вОбеСтороны', 'МотоБат', 'Приставы', 'Регулировщик', 'Медичка', 'Много'],
+    'Нужна помощь': ['Прикурите', 'Обсох', 'ВозьмитеНаТрос', 'ПроводаЕсть', 'ПроводаНет', 'НуженКомпрессор', 'НуженДомкрат'],
+    'Вопрос': ['НеРаботаетСветофор', 'Яма', 'ДТП', 'ДорожныеРаботы', 'Перекрыто'],
+    'Чисто': []
+};
+
 // Yandex Maps Application
 class DPSMap {
     constructor() {
@@ -49,15 +57,288 @@ class DPSMap {
         this.currentPost = null;
         this.deviceId = getDeviceId();
         this.realtimeChannel = null;
+        
+        this.currentUser = null;
+        this.newMarkerCoords = null;
+        this.selectedTags = [];
 
         this.init();
     }
 
     async init() {
+        await this.checkAuth();
+        this.initUI();
         await this.loadPosts();
         this.initMap();
-        this.initBottomSheet();
         this.initRealtime();
+    }
+    
+    async checkAuth() {
+        try {
+            const response = await fetch('/api/auth/me');
+            if (response.ok) {
+                const data = await response.json();
+                this.currentUser = data.user;
+                this.updateAuthUI();
+            }
+        } catch (error) {
+            console.error('Auth check error:', error);
+        }
+        
+        // Setup logout button
+        document.getElementById('btn-logout').addEventListener('click', async () => {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                this.currentUser = null;
+                this.updateAuthUI();
+                
+                // Show auth visual section
+                document.getElementById('auth-section').style.display = 'block';
+                document.getElementById('profile-section').style.display = 'none';
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        });
+    }
+
+    updateAuthUI() {
+        const authSection = document.getElementById('auth-section');
+        const profileSection = document.getElementById('profile-section');
+        const adminBtn = document.getElementById('admin-link');
+
+        if (this.currentUser) {
+            authSection.style.display = 'none';
+            profileSection.style.display = 'block';
+            document.getElementById('profile-username').textContent = this.currentUser.username;
+            
+            // Hide admin button for regular users
+            if (this.currentUser.role !== 'admin') {
+                adminBtn.style.display = 'none';
+            } else {
+                adminBtn.style.display = 'flex';
+                document.querySelector('.profile-role').textContent = 'Администратор';
+            }
+        } else {
+            authSection.style.display = 'block';
+            profileSection.style.display = 'none';
+        }
+    }
+
+    initUI() {
+        // Overlay logic
+        const overlay = document.getElementById('drawer-overlay');
+        const closeAllDrawers = () => {
+            overlay.classList.remove('active');
+            document.querySelectorAll('.drawer-modal, .bottom-sheet').forEach(m => m.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('nav-map').classList.add('active'); // default to map active
+        };
+
+        overlay.addEventListener('click', closeAllDrawers);
+
+        // Bottom Nav logic
+        document.getElementById('nav-map').addEventListener('click', (e) => {
+            e.preventDefault();
+            closeAllDrawers();
+        });
+
+        document.getElementById('nav-add').addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!this.currentUser) {
+                this.showError('Для добавления меток необходимо войти в аккаунт.');
+                document.getElementById('nav-settings').click();
+                return;
+            }
+            if (!this.newMarkerCoords) {
+                this.showError('Сначала нажмите на карту, чтобы выбрать место.');
+                return;
+            }
+            
+            closeAllDrawers();
+            document.getElementById('nav-add').classList.add('active');
+            overlay.classList.add('active');
+            document.getElementById('add-post-drawer').classList.add('active');
+            
+            // Trigger tags regeneration
+            this.generateTags(document.getElementById('post-type').value);
+        });
+
+        document.getElementById('nav-settings').addEventListener('click', (e) => {
+            e.preventDefault();
+            closeAllDrawers();
+            document.getElementById('nav-settings').classList.add('active');
+            overlay.classList.add('active');
+            document.getElementById('settings-drawer').classList.add('active');
+        });
+
+        // Drawer Close Buttons
+        document.querySelectorAll('.drawer-close').forEach(btn => {
+            btn.addEventListener('click', closeAllDrawers);
+        });
+
+        // Auth Tabs
+        document.querySelectorAll('.auth-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.auth-form').forEach(f => f.style.display = 'none');
+                
+                e.target.classList.add('active');
+                const formId = e.target.getAttribute('data-tab') + '-form';
+                document.getElementById(formId).style.display = 'block';
+            });
+        });
+
+        // Marker Details (Bottom Sheet)
+        const btnRelevant = document.getElementById('btn-relevant');
+        const btnIrrelevant = document.getElementById('btn-irrelevant');
+        btnRelevant.addEventListener('click', () => this.vote('relevant'));
+        btnIrrelevant.addEventListener('click', () => this.vote('irrelevant'));
+
+        // Forms logic
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    this.currentUser = data.user;
+                    this.updateAuthUI();
+                    document.getElementById('login-form').reset();
+                } else {
+                    this.showError(data.error || 'Ошибка входа');
+                }
+            } catch (error) {
+                this.showError('Ошибка сети');
+            }
+        });
+
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('register-username').value;
+            const password = document.getElementById('register-password').value;
+            
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    this.currentUser = data.user;
+                    this.updateAuthUI();
+                    document.getElementById('register-form').reset();
+                } else {
+                    this.showError(data.error || 'Ошибка регистрации');
+                }
+            } catch (error) {
+                this.showError('Ошибка сети');
+            }
+        });
+
+        // Add Post Category Selector
+        document.querySelectorAll('.type-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                const type = e.target.getAttribute('data-type');
+                document.getElementById('post-type').value = type;
+                this.generateTags(type);
+            });
+        });
+        
+        // Setup initial tags
+        this.generateTags('ДПС');
+
+        // Add Post Form Submission
+        document.getElementById('add-post-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!this.newMarkerCoords) {
+                this.showError("Не выбрано место на карте");
+                return;
+            }
+
+            const title = document.getElementById('post-new-comment').value.trim() || 'Метка пользователя';
+            const type = document.getElementById('post-type').value;
+            const comment = document.getElementById('post-new-comment').value;
+
+            try {
+                // Get approximate address
+                let address = '';
+                try {
+                    const ymapsResponse = await ymaps.geocode(this.newMarkerCoords);
+                    const firstGeoObject = ymapsResponse.geoObjects.get(0);
+                    if (firstGeoObject) address = firstGeoObject.getAddressLine();
+                } catch(e) {}
+
+                const response = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: type, // Make title the type so it's clean
+                        type,
+                        comment,
+                        tags: this.selectedTags,
+                        address,
+                        latitude: this.newMarkerCoords[0],
+                        longitude: this.newMarkerCoords[1]
+                    })
+                });
+
+                if (response.ok) {
+                    closeAllDrawers();
+                    document.getElementById('add-post-form').reset();
+                    this.selectedTags = []; // clear tags
+                    await this.loadPosts();
+                    this.renderMarkers();
+                    this.newMarkerCoords = null; // reset coords
+                } else {
+                    const data = await response.json();
+                    this.showError(data.error || 'Ошибка создания метки');
+                }
+            } catch (error) {
+                this.showError('Ошибка при создании');
+            }
+        });
+    }
+
+    generateTags(category) {
+        const container = document.getElementById('tags-selector');
+        container.innerHTML = '';
+        this.selectedTags = [];
+
+        const tags = HASHTAGS_MAP[category] || [];
+        if (tags.length === 0) {
+            container.innerHTML = '<span class="text-muted" style="font-size:0.85rem;">Для данной категории теги не требуются</span>';
+            return;
+        }
+
+        tags.forEach(tag => {
+            const el = document.createElement('div');
+            el.className = 'tag-badge';
+            el.textContent = `#${tag}`;
+            
+            el.addEventListener('click', () => {
+                if (el.classList.contains('selected')) {
+                    el.classList.remove('selected');
+                    this.selectedTags = this.selectedTags.filter(t => t !== tag);
+                } else {
+                    el.classList.add('selected');
+                    this.selectedTags.push(tag);
+                }
+            });
+            container.appendChild(el);
+        });
     }
 
     async loadPosts() {
@@ -73,6 +354,7 @@ class DPSMap {
     }
 
     initRealtime() {
+        // ... omitted unchanged realtime logic
         const supabaseClient = window.supabase.createClient(
             'https://plfzklrsmasyfibwgwjy.supabase.co',
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsZnprbHJzbWFzeWZpYndnd2p5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMTEyNDEsImV4cCI6MjA4Nzc4NzI0MX0.ov_SXuO2vBkAKi0TU9YGbEyShy2LhCnybpO9y6unXuU'
@@ -84,13 +366,9 @@ class DPSMap {
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'votes' },
                 async (payload) => {
-                    console.log('[Realtime] Новый голос:', payload.new);
-
-                    // Перезагружаем посты
                     await this.loadPosts();
                     this.renderMarkers();
 
-                    // Если открыт bottom sheet этого поста — обновить без закрытия
                     if (this.currentPost && this.currentPost.post_id === payload.new.post_id) {
                         const updatedPost = this.posts.find(p => p.post_id === payload.new.post_id);
                         if (updatedPost) {
@@ -100,27 +378,19 @@ class DPSMap {
                     }
                 }
             )
-            .subscribe((status) => {
-                console.log('[Realtime] Статус подключения:', status);
-            });
+            .subscribe();
     }
 
-    // Обновляет только время в bottom sheet без полного перерендера
     updateBottomSheetTimes(post) {
         const relevantTime = document.getElementById('relevant-time');
-        const irrelevantTime = document.getElementById('irrelevant-time');
-        if (!relevantTime || !irrelevantTime) return;
-
-        relevantTime.textContent = formatTimeAgo(post.last_relevant);
-        irrelevantTime.textContent = formatTimeAgo(post.last_irrelevant);
-
-        relevantTime.className = 'status-time';
-        irrelevantTime.className = 'status-time';
-
-        if (isStale(post.last_relevant)) relevantTime.classList.add('stale');
-        if (isStale(post.last_irrelevant)) irrelevantTime.classList.add('stale');
-        if (!post.last_relevant) relevantTime.classList.add('no-data');
-        if (!post.last_irrelevant) irrelevantTime.classList.add('no-data');
+        // const irrelevantTime = document.getElementById('irrelevant-time');
+        
+        if (relevantTime) {
+            relevantTime.textContent = formatTimeAgo(post.last_relevant);
+            relevantTime.className = 'status-time';
+            if (isStale(post.last_relevant)) relevantTime.classList.add('stale');
+            if (!post.last_relevant) relevantTime.classList.add('no-data');
+        }
     }
 
     initMap() {
@@ -145,8 +415,25 @@ class DPSMap {
             this.renderMarkers();
             this.hideLoading();
 
-            this.map.events.add('click', () => {
-                document.getElementById('bottom-sheet').classList.remove('active');
+            // Map click handler wrapper
+            this.map.events.add('click', (e) => {
+                const drawers = document.querySelectorAll('.drawer-modal.active, .bottom-sheet.active');
+                if (drawers.length > 0) {
+                    drawers.forEach(d => d.classList.remove('active'));
+                    document.getElementById('drawer-overlay').classList.remove('active');
+                    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                    document.getElementById('nav-map').classList.add('active');
+                    return;
+                }
+
+                if (!this.currentUser) {
+                    alert('Войдите в систему (нажав на Шестеренку), чтобы добавить метку');
+                    return;
+                }
+
+                // Show modal to add a marker
+                this.newMarkerCoords = e.get('coords');
+                document.getElementById('nav-add').click();
             });
         });
     }
@@ -158,24 +445,27 @@ class DPSMap {
         this.markers = {};
 
         this.posts.forEach(post => {
-            const markerClass = this.getMarkerClass(post);
-            const markerColor = this.getMarkerColor(markerClass);
+            const markerPreset = this.getMarkerPresetByType(post.type);
+            const iconContent = this.getIconContentByType(post.type);
+            
+            let tagStr = post.tags && post.tags.length > 0 ? `<br><em>${post.tags.map(t => '#'+t).join(' ')}</em>` : '';
 
             const placemark = new ymaps.Placemark(
                 [post.latitude, post.longitude],
                 {
-                    hintContent: post.title,
-                    balloonContent: `<strong>${post.title}</strong><br>${post.address || ''}`
+                    hintContent: post.type || 'ДПС',
+                    balloonContent: `<strong>${post.type || 'ДПС'}</strong><br>${post.comment || ''}${tagStr}`,
+                    iconContent: iconContent
                 },
                 {
-                    preset: markerColor,
-                    iconColor: this.getIconColor(markerClass),
+                    preset: markerPreset,
                     hideIconOnBalloonOpen: false
                 }
             );
 
             placemark.events.add('click', (e) => {
                 e.preventDefault();
+                // Map automatically centers so bottom sheet logic happens next
                 this.showPostDetails(post);
             });
 
@@ -184,43 +474,59 @@ class DPSMap {
         });
     }
 
-    getMarkerClass(post) {
-        const lastRelevant = post.last_relevant ? new Date(post.last_relevant) : null;
-        const lastIrrelevant = post.last_irrelevant ? new Date(post.last_irrelevant) : null;
-
-        const lastActivity = post.last_activity ? new Date(post.last_activity) : null;
-        if (!lastActivity || isStale(post.last_activity)) {
-            return 'marker-stale';
-        }
-
-        if (lastRelevant && (!lastIrrelevant || lastRelevant > lastIrrelevant)) {
-            return 'marker-relevant';
-        }
-
-        if (lastIrrelevant && (!lastRelevant || lastIrrelevant > lastRelevant)) {
-            return 'marker-irrelevant';
-        }
-
-        return 'marker-stale';
+    getMarkerPresetByType(type) {
+        if (type === 'Нужна помощь') return 'islands#orangeStretchyIcon';
+        if (type === 'Чисто') return 'islands#greenStretchyIcon';
+        if (type === 'Вопрос') return 'islands#lightBlueStretchyIcon';
+        return 'islands#redStretchyIcon'; // ДПС
     }
 
-    getMarkerColor(markerClass) {
-        if (markerClass === 'marker-relevant') return 'islands#redIcon';
-        if (markerClass === 'marker-irrelevant') return 'islands#grayIcon';
-        return 'islands#darkGrayIcon';
+    getIconContentByType(type) {
+        if (type === 'Нужна помощь') return '🆘 SOS';
+        if (type === 'Чисто') return '✅ Чисто';
+        if (type === 'Вопрос') return '⚠️ Событие';
+        return '🚔 ДПС'; // ДПС
     }
 
-    getIconColor(markerClass) {
-        if (markerClass === 'marker-relevant') return '#f43f5e';
-        if (markerClass === 'marker-irrelevant') return '#64748b';
-        return '#475569';
+    getTypeClass(type) {
+        if (type === 'Нужна помощь') return 'type-help';
+        if (type === 'Чисто') return 'type-clear';
+        if (type === 'Вопрос') return 'type-question';
+        return 'type-dps';
     }
 
     showPostDetails(post) {
         this.currentPost = post;
 
-        document.getElementById('post-title').textContent = post.title;
-        document.getElementById('post-address').textContent = post.address || 'Адрес не указан';
+        // Reset details
+        const typeBadge = document.getElementById('post-type-badge');
+        typeBadge.textContent = post.type || 'ДПС';
+        typeBadge.className = `post-type-badge ${this.getTypeClass(post.type)}`;
+        
+        document.getElementById('post-author').textContent = post.username ? `@${post.username}` : '@аноним';
+        
+        // Tags
+        const tagsContainer = document.getElementById('post-tags-container');
+        tagsContainer.innerHTML = '';
+        if (post.tags && post.tags.length > 0) {
+            post.tags.forEach(t => {
+                const el = document.createElement('div');
+                el.className = 'tag-badge selected';
+                el.textContent = `#${t}`;
+                tagsContainer.appendChild(el);
+            });
+            tagsContainer.style.display = 'flex';
+        } else {
+            tagsContainer.style.display = 'none';
+        }
+
+        const commentContainer = document.getElementById('post-comment-container');
+        if (post.comment) {
+            document.getElementById('post-comment').textContent = post.comment;
+            commentContainer.style.display = 'block';
+        } else {
+            commentContainer.style.display = 'none';
+        }
 
         this.updateBottomSheetTimes(post);
 
@@ -231,6 +537,7 @@ class DPSMap {
         message.className = 'vote-message';
         message.style.display = 'none';
 
+        // Open Bottom Sheet visually
         document.getElementById('bottom-sheet').classList.add('active');
 
         this.map.panTo([post.latitude, post.longitude], {
@@ -239,20 +546,11 @@ class DPSMap {
         });
     }
 
-    initBottomSheet() {
-        const btnRelevant = document.getElementById('btn-relevant');
-        const btnIrrelevant = document.getElementById('btn-irrelevant');
-
-        btnRelevant.addEventListener('click', () => this.vote('relevant'));
-        btnIrrelevant.addEventListener('click', () => this.vote('irrelevant'));
-    }
-
     async vote(voteType) {
         if (!this.currentPost) return;
 
         const btnRelevant = document.getElementById('btn-relevant');
         const btnIrrelevant = document.getElementById('btn-irrelevant');
-        const message = document.getElementById('vote-message');
 
         btnRelevant.disabled = true;
         btnIrrelevant.disabled = true;
@@ -272,8 +570,6 @@ class DPSMap {
 
             if (response.ok) {
                 this.showMessage('success', data.message || 'Голос принят!');
-                // Realtime сам обновит маркеры и bottom sheet у всех
-                // Локально тоже обновим сразу для быстрого отклика
                 await this.loadPosts();
                 this.renderMarkers();
                 const updatedPost = this.posts.find(p => p.post_id === this.currentPost.post_id);

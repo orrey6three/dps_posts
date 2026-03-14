@@ -2,63 +2,194 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DPS45 — Карта постов ДПС</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#07070a">
+    <title>DPS45 - Знай, где стоят</title>
     <meta name="description" content="Народная карта постов ДПС в Шумихе, Курганская область">
+    
+    <!-- Yandex Maps -->
     <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+    <!-- Supabase -->
     <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <!-- FontAwesome (for icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
+    <!-- Fullscreen Map Container -->
     <div id="map"></div>
+
+    <!-- Loading Screen -->
     <div id="loading" class="loading-overlay">
         <div class="loading-spinner"></div>
         <p>Загрузка карты...</p>
     </div>
+
+    <!-- Marker Details Bottom Sheet (Drawer) -->
     <div id="bottom-sheet" class="bottom-sheet">
         <div class="bottom-sheet-handle"></div>
-
         <div id="post-details" class="post-details">
-            <h2 id="post-title"></h2>
-            <p id="post-address"></p>
+            <div class="post-header">
+                <div class="post-type-badge type-dps" id="post-type-badge">ДПС</div>
+                <div class="post-author" id="post-author">@username</div>
+            </div>
+            
+            <h2 id="post-title" style="display:none;"></h2>
+            <p id="post-address" class="address-text" style="display: none;"></p>
+            
+            <div id="post-tags-container" class="tags-container">
+                <!-- Tags will be injected here -->
+            </div>
+
+            <div class="post-comment" id="post-comment-container" style="display: none;">
+                <p id="post-comment"></p>
+            </div>
 
             <div class="status-container">
                 <div class="status-item">
-                    <span class="status-label">Актуально:</span>
+                    <span class="status-label">Последнее подтверждение:</span>
                     <span id="relevant-time" class="status-time"></span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Неактуально:</span>
-                    <span id="irrelevant-time" class="status-time"></span>
                 </div>
             </div>
 
             <div class="button-container">
                 <button id="btn-relevant" class="vote-button vote-relevant">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                    <span>Актуально</span>
+                    <i class="fa-solid fa-check"></i>
+                    <span>Есть</span>
                 </button>
                 <button id="btn-irrelevant" class="vote-button vote-irrelevant">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                    <span>Неактуально</span>
+                    <i class="fa-solid fa-xmark"></i>
+                    <span>Нету</span>
                 </button>
             </div>
-
             <div id="vote-message" class="vote-message"></div>
         </div>
     </div>
 
-    <a href="/admin" class="admin-button" title="Админка">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-        </svg>
-    </a>
+    <!-- Add Post Drawer (Full Screen Modal style) -->
+    <div id="add-post-drawer" class="drawer-modal">
+        <div class="drawer-header">
+            <button class="drawer-close" id="btn-close-add">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <h2>Добавить метку</h2>
+        </div>
+        <div class="drawer-content">
+            <form id="add-post-form">
+                <div class="form-group type-selector">
+                    <div class="type-btn active" data-type="ДПС" style="--btn-color: #f43f5e">ДПС</div>
+                    <div class="type-btn" data-type="Нужна помощь" style="--btn-color: #eab308">SOS</div>
+                    <div class="type-btn" data-type="Вопрос" style="--btn-color: #38bdf8">!</div>
+                    <div class="type-btn" data-type="Чисто" style="--btn-color: #22c55e">Чисто</div>
+                </div>
+                
+                <input type="hidden" id="post-type" value="ДПС">
+
+                <div class="form-group">
+                    <label class="form-label text-muted">Быстрые теги:</label>
+                    <div id="tags-selector" class="tags-selector">
+                        <!-- Javascript will populate tags here depending on the type -->
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label text-muted">Описание</label>
+                    <textarea id="post-new-comment" placeholder="До 125 символов (необязательно)" maxlength="125" rows="2"></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-full submit-btn">Опубликовать</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Settings/Profile Drawer -->
+    <div id="settings-drawer" class="drawer-modal">
+        <div class="drawer-header">
+            <button class="drawer-close" id="btn-close-settings">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <h2>Настройки</h2>
+        </div>
+        <div class="drawer-content">
+            
+            <!-- When Not Logged In -->
+            <div id="auth-section" class="auth-section">
+                <p class="text-secondary mb-4">Войдите, чтобы добавлять метки и участвовать в жизни сообщества.</p>
+                <div class="auth-tabs">
+                    <button class="auth-tab active" data-tab="login">Вход</button>
+                    <button class="auth-tab" data-tab="register">Регистрация</button>
+                </div>
+                
+                <!-- Login Form -->
+                <form id="login-form" class="auth-form active-form">
+                    <div class="form-group">
+                        <input type="text" id="login-username" placeholder="Имя пользователя" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="login-password" placeholder="Пароль" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full mb-3">Войти</button>
+                </form>
+
+                <!-- Register Form -->
+                <form id="register-form" class="auth-form" style="display:none;">
+                    <div class="form-group">
+                        <input type="text" id="register-username" placeholder="Придумайте никнейм" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="register-password" placeholder="Пароль" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full mb-3">Регистрация</button>
+                </form>
+            </div>
+
+            <!-- When Logged In -->
+            <div id="profile-section" class="profile-section" style="display: none;">
+                <div class="profile-card mb-4">
+                    <div class="profile-avatar"><i class="fa-solid fa-user"></i></div>
+                    <div class="profile-info">
+                        <h3 id="profile-username">Username</h3>
+                        <span class="profile-role">Участник</span>
+                    </div>
+                </div>
+                
+                <div class="settings-list">
+                    <a href="/admin" class="settings-item" id="admin-link">
+                        <div class="settings-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                        <span>Панель управления</span>
+                        <i class="fa-solid fa-chevron-right chevron"></i>
+                    </a>
+                    <div class="settings-item danger-item" id="btn-logout">
+                        <div class="settings-icon"><i class="fa-solid fa-arrow-right-from-bracket"></i></div>
+                        <span>Выйти из аккаунта</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+        <a href="#" class="nav-item active" id="nav-map">
+            <i class="fa-solid fa-map-location-dot"></i>
+            <span>Карта</span>
+        </a>
+        <a href="#" class="nav-item add-btn" id="nav-add">
+            <div class="add-icon-wrapper">
+                <i class="fa-solid fa-plus"></i>
+            </div>
+        </a>
+        <a href="#" class="nav-item" id="nav-settings">
+            <i class="fa-solid fa-gear"></i>
+            <span>Настройки</span>
+        </a>
+    </nav>
+
+    <!-- Overlay for drawers -->
+    <div id="drawer-overlay" class="modal-overlay"></div>
 
     <script src="./js/app.js"></script>
     <script>
