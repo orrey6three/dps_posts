@@ -42,20 +42,6 @@ function formatYekaterinburgTime(timestamp) {
     });
 }
 
-function formatYekaterinburgTime(timestamp) {
-    if (!timestamp) return '—';
-    const date = new Date(timestamp);
-    
-    // Yekaterinburg is UTC+5. 
-    // We use Intl.DateTimeFormat for reliable timezone formatting
-    return new Intl.DateTimeFormat('ru-RU', {
-        timeZone: 'Asia/Yekaterinburg',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-    }).format(date);
-}
-
 function isStale(timestamp) {
     if (!timestamp) return true;
     const now = Date.now();
