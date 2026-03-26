@@ -3,7 +3,8 @@ import voteService from '../services/vote.service.js';
 class VoteController {
   async submitVote(req, res) {
     try {
-      const { post_id, device_id, vote_type } = req.body;
+      const { post_id, vote_type } = req.body;
+      const device_id = req.user ? req.user.id : req.body.device_id;
       
       if (!post_id || !device_id || !vote_type) {
         return res.status(400).json({ 

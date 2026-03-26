@@ -414,6 +414,13 @@ a {
     border-color: rgba(34, 197, 94, 0.35);
 }
 
+.post-type-badge.type-patrol {
+    background: linear-gradient(90deg, rgba(255, 0, 0, 0.2), rgba(0, 0, 255, 0.2));
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.3);
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+}
+
 .tags-selector, .tags-container {
     display: flex;
     flex-wrap: wrap;
@@ -1426,6 +1433,92 @@ a {
     color: white;
     transform: translateY(-2px);
     border-color: var(--accent);
+}
+
+/* Radius Selector */
+.radius-selector {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    background: var(--bg-deep);
+    padding: 4px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+}
+
+.radius-btn {
+    padding: 10px 0;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.radius-btn:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+}
+
+.radius-btn.active {
+    background: var(--accent);
+    color: white;
+    box-shadow: 0 4px 15px rgba(255, 61, 90, 0.3);
+}
+
+/* Quiet Hours Grid */
+.quiet-hours-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.time-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.time-input-group .form-label {
+    font-size: 0.72rem;
+    margin-bottom: 0;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.time-field-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.time-field-wrapper i {
+    position: absolute;
+    left: 12px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.time-field-wrapper input {
+    width: 100%;
+    padding: 10px 10px 10px 34px !important;
+    font-size: 0.9rem !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.time-field-wrapper input:focus {
+    border-color: var(--accent) !important;
+    background: rgba(255, 61, 90, 0.03) !important;
 }
 
 /* Map controls spacing */

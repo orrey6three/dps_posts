@@ -6,9 +6,10 @@ import { optionalAuth, requireAuth } from '../middlewares/auth.middleware.js';
 const router = express.Router();
 
 router.get('/posts', postController.getPosts);
+router.post('/patrol', postController.createPatrolFromBot); // Bot/webhook endpoint
 router.post('/posts', requireAuth, postController.createPostByUser);
 router.delete('/posts/:id', requireAuth, postController.deleteOwnPost);
-router.post('/vote', voteController.submitVote);
+router.post('/vote', requireAuth, voteController.submitVote);
 
 router.get('/health', (req, res) => {
   res.json({ 

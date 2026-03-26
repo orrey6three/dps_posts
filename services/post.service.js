@@ -22,16 +22,32 @@ class PostService {
    * Delete posts older than 1 hour
    */
   async cleanupOldPosts() {
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    
-    const { error } = await supabaseAdmin
-        .from('posts')
-        .delete()
-        .lt('created_at', oneHourAgo);
+    const now = Date.now();
+    const oneHourAgo = new Date(now - 60 * 60 * 1000).toISOString();
+    const fiveMinutesAgo = new Date(now - 5 * 60 * 1000).toISOString();
 
-    if (error) {
-      console.error('Error cleaning up old posts:', error);
-      // We don't throw here to avoid breaking the main fetch if cleanup fails
+    // 1) Patrol routes live only 5 minutes
+    const { error: patrolError } = await supabaseAdmin
+      .from('posts')
+      .delete()
+      .eq('type', 'Патруль')
+      .eq('is_static', false)
+      .lt('created_at', fiveMinutesAgo);
+
+    if (patrolError) {
+      console.error('Error cleaning up patrol posts:', patrolError);
+    }
+
+    // 2) All other dynamic posts live 1 hour
+    const { error: regularError } = await supabaseAdmin
+      .from('posts')
+      .delete()
+      .neq('type', 'Патруль')
+      .eq('is_static', false)
+      .lt('created_at', oneHourAgo);
+
+    if (regularError) {
+      console.error('Error cleaning up old posts:', regularError);
     }
   }
 
@@ -51,11 +67,12 @@ class PostService {
   /**
    * Create a new post
    */
-  async createPost(title, address, latitude, longitude, type, comment, tags, userId) {
+  async createPost(title, address, latitude, longitude, type, comment, tags, userId, streetGeometry = null) {
     const payload = { title, address, latitude, longitude, type };
     if (comment) payload.comment = comment;
     if (tags && Array.isArray(tags)) payload.tags = tags;
     if (userId) payload.user_id = userId;
+    if (streetGeometry) payload.street_geometry = streetGeometry;
 
     const { data, error } = await supabaseAdmin
         .from('posts')

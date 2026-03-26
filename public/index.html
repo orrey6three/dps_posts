@@ -97,6 +97,7 @@
             <form id="add-post-form">
                 <div class="form-group type-selector">
                     <div class="type-btn active" data-type="ДПС" style="--btn-color: #f43f5e">ДПС</div>
+                    <div class="type-btn" data-type="Патруль" style="--btn-color: #3b82f6">Патруль</div>
                     <div class="type-btn" data-type="Нужна помощь" style="--btn-color: #eab308">SOS</div>
                     <div class="type-btn" data-type="Вопрос" style="--btn-color: #38bdf8">!</div>
                     <div class="type-btn" data-type="Чисто" style="--btn-color: #22c55e">Чисто</div>
@@ -220,6 +221,44 @@
                     <span>Связаться с разработчиком</span>
                     <div class="theme-status-tag active" style="background: rgba(234, 67, 53, 0.1); color: #ea4335;">orstudiocorp@gmail.com</div>
                 </a>
+            </div>
+
+            <div class="settings-list mb-4">
+                <div class="settings-item" id="notify-toggle">
+                    <div class="settings-icon"><i class="fa-solid fa-bell"></i></div>
+                    <div class="settings-info" style="flex:1;">
+                        <span>Push-уведомления</span>
+                        <div id="notify-sub" class="text-muted" style="font-size: 0.75rem;">Радиус 1 км</div>
+                    </div>
+                    <div id="notify-status" class="theme-status-tag">Выкл</div>
+                </div>
+
+                <div id="notify-config" style="display:none; padding: 0 10px 10px;">
+                    <label class="form-label text-muted" style="font-size: 0.75rem; margin-top: 10px;">Радиус оповещения (км):</label>
+                    <div class="radius-selector mb-3">
+                        <button class="radius-btn active" data-radius="1">1</button>
+                        <button class="radius-btn" data-radius="5">5</button>
+                        <button class="radius-btn" data-radius="15">15</button>
+                        <button class="radius-btn" data-radius="50">50</button>
+                    </div>
+
+                    <div class="quiet-hours-grid">
+                        <div class="time-input-group">
+                            <label class="form-label text-muted">Тихий режим с:</label>
+                            <div class="time-field-wrapper">
+                                <i class="fa-regular fa-clock"></i>
+                                <input type="time" id="quiet-start" value="23:00" step="60">
+                            </div>
+                        </div>
+                        <div class="time-input-group">
+                            <label class="form-label text-muted">Тихий режим до:</label>
+                            <div class="time-field-wrapper">
+                                <i class="fa-regular fa-clock"></i>
+                                <input type="time" id="quiet-end" value="07:00" step="60">
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
         </div>

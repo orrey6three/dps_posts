@@ -42,17 +42,15 @@ function formatYekaterinburgTime(timestamp) {
     });
 }
 
-function isStale(timestamp) {
+function isStale(timestamp, ttlMs = 60 * 60 * 1000) {
     if (!timestamp) return true;
     const now = Date.now();
     const postTime = new Date(timestamp).getTime();
-    
-    // Strict 1 hour lifecycle for ALL markers
-    const oneHourAgo = now - 1 * 60 * 60 * 1000;
-    return postTime < oneHourAgo;
+    return postTime < (now - ttlMs);
 }
 const HASHTAGS_MAP = {
     'ДПС': ['Одинокий', 'ДвеПалки', 'ТриПалки', 'ВсехПодряд', 'ТехКонтроль', 'Тонировка', 'Пешеходы', 'СвежееДыхание', 'Страховка', 'вОбеСтороны', 'МотоБат', 'Приставы', 'Регулировщик', 'Медичка', 'Много'],
+    'Патруль': ['Одинокий', 'ВсехПодряд', 'вОбеСтороны', 'МотоБат'],
     'Нужна помощь': ['Прикурите', 'Обсох', 'ВозьмитеНаТрос', 'ПроводаЕсть', 'ПроводаНет', 'НуженКомпрессор', 'НуженДомкрат'],
     'Вопрос': ['НеРаботаетСветофор', 'Яма', 'ДТП', 'ДорожныеРаботы', 'Перекрыто'],
     'Чисто': []
@@ -104,6 +102,11 @@ class DPSMap {
         this.initMap();
         this.initRealtime();
         this.initNotifications();
+        
+        // Initial check on load
+        setTimeout(() => {
+            this.notifyOnStart();
+        }, 3000);
     }
     
     initTheme() {
@@ -804,16 +807,24 @@ class DPSMap {
     }
 
     renderMarkers() {
-        Object.values(this.markers).forEach(marker => this.map.geoObjects.remove(marker));
+        Object.values(this.markers).forEach(marker => {
+            if (!marker) return;
+            if (Array.isArray(marker)) {
+                marker.forEach(obj => obj && this.map.geoObjects.remove(obj));
+            } else {
+                this.map.geoObjects.remove(marker);
+            }
+        });
         this.markers = {};
         if (this.heatmap) { this.heatmap.setMap(null); this.heatmap = null; }
 
         if (!this.posts || !Array.isArray(this.posts)) return;
 
         const filtered = this.posts.filter(post => {
-            if (this.filters.type === 'dps' && post.type !== 'ДПС') return false;
+            if (this.filters.type === 'dps' && !['ДПС', 'Патруль'].includes(post.type)) return false;
             if (this.filters.type === 'sos' && post.type !== 'Нужна помощь') return false;
-            if (this.filters.freshOnly && isStale(post.last_activity || post.last_relevant || post.created_at)) return false;
+            const ttl = post.type === 'Патруль' ? 5 * 60 * 1000 : 60 * 60 * 1000;
+            if (this.filters.freshOnly && isStale(post.last_activity || post.last_relevant || post.created_at, ttl)) return false;
             if (this.filters.myVotes && !this.votedPosts.includes(post.post_id)) return false;
             return true;
         });
@@ -844,7 +855,15 @@ class DPSMap {
         filtered.forEach(post => {
             const timeRelevant = post.last_relevant ? new Date(post.last_relevant).getTime() : new Date(post.created_at).getTime();
             const timeIrrelevant = post.last_irrelevant ? new Date(post.last_irrelevant).getTime() : 0;
-            const isCurrentlyStale = isStale(timeRelevant);
+            const expireMs = post.type === 'Патруль' ? 5 * 60 * 1000 : 60 * 60 * 1000;
+            const isCurrentlyStale = isStale(timeRelevant, expireMs);
+
+            // Special handling for Patrol Route - MUST BE BEFORE other checks
+            if (post.type === 'Патруль') {
+                if (isCurrentlyStale) return;
+                if (post.street_geometry) this.renderPatrolRoute(post);
+                return;
+            }
 
             if (isCurrentlyStale && (post.type === 'Нужна помощь' || post.type === 'Чисто')) return;
 
@@ -904,6 +923,7 @@ class DPSMap {
         if (type === 'Нужна помощь') return '🆘';
         if (type === 'Чисто') return '✅';
         if (type === 'Вопрос') return '⚠️';
+        if (type === 'Патруль') return '🚓';
         return '🚔'; // ДПС
     }
 
@@ -911,7 +931,60 @@ class DPSMap {
         if (type === 'Нужна помощь') return 'type-help';
         if (type === 'Чисто') return 'type-clear';
         if (type === 'Вопрос') return 'type-question';
+        if (type === 'Патруль') return 'type-patrol';
         return 'type-dps';
+    }
+
+    renderPatrolRoute(post) {
+        if (!post.street_geometry || !Array.isArray(post.street_geometry)) return;
+
+        // Custom dash animation style
+        const patrolLine = new ymaps.Polyline(post.street_geometry, {
+            hintContent: `Патруль на ${post.address || 'улице'}`,
+            balloonContent: `<strong>Патруль ДПС</strong><br>${post.comment || ''}<br><small>Исчезнет через 5 минут</small>`
+        }, {
+            strokeColor: '#ff0000', // Base red
+            strokeWidth: 5,
+            strokeOpacity: 0.8,
+            strokeStyle: 'shortdash', // We simulate red-blue with two lines
+            zIndex: 100
+        });
+
+        const patrolLineBlue = new ymaps.Polyline(post.street_geometry, {}, {
+            strokeColor: '#0000ff', // Blue
+            strokeWidth: 5,
+            strokeOpacity: 0.8,
+            strokeStyle: 'shortdash',
+            strokeOffset: 10, // Offset to alternate with red
+            zIndex: 101
+        });
+
+        this.map.geoObjects.add(patrolLine);
+        this.map.geoObjects.add(patrolLineBlue);
+        
+        // Use a composite key to avoid conflicts
+        const markerKey = 'patrol_' + post.post_id;
+        this.markers[markerKey] = patrolLine;
+
+        // Animation logic for "moving" lights - faster and smoother
+        let offset = 0;
+        const animInterval = setInterval(() => {
+            if (!this.markers[markerKey]) {
+                clearInterval(animInterval);
+                return;
+            }
+            offset = (offset + 2) % 40; // Double step for speed
+            patrolLine.options.set('strokeOffset', offset);
+            patrolLineBlue.options.set('strokeOffset', offset + 10);
+        }, 100);
+
+        // Auto-remove after 5 minutes (300,000 ms)
+        setTimeout(() => {
+            if (this.map.geoObjects.indexOf(patrolLine) !== -1) this.map.geoObjects.remove(patrolLine);
+            if (this.map.geoObjects.indexOf(patrolLineBlue) !== -1) this.map.geoObjects.remove(patrolLineBlue);
+            delete this.markers[markerKey];
+            clearInterval(animInterval);
+        }, 5 * 60 * 1000);
     }
 
     showPostDetails(post) {
@@ -1255,6 +1328,31 @@ class DPSMap {
         if (this.notificationOptions.enabled) {
             this.requestNotificationPermission();
             this.startNotifyLoop();
+        } else {
+            // Optional: Still try to get location once if notifications disabled
+            // so we can switch city or show nearby stuff if needed
+            this.fetchUserLocation();
+        }
+    }
+
+    notifyOnStart() {
+        if (!this.notificationOptions.enabled || !this.userLocation || Notification.permission !== 'granted') return;
+
+        const radiusM = this.notificationOptions.radius * 1000;
+        const entries = (this.posts || []).filter(post => {
+            if (!(post.type === 'ДПС' || post.type === 'Нужна помощь')) return false;
+            const dist = this.haversine(this.userLocation, [post.latitude, post.longitude]);
+            return dist <= radiusM;
+        });
+
+        if (entries.length > 0) {
+            const count = entries.length;
+            const text = count === 1 ? 'Рядом обнаружен 1 пост' : `Рядом обнаружено ${count} поста/ов`;
+            new Notification('DPS45: Внимание', {
+                body: `${text}. Будьте осторожны!`,
+                icon: '/favicon.png'
+            });
+            this.showSuccess(text);
         }
     }
 
