@@ -705,12 +705,23 @@ class DPSMap {
         }
 
         const relevantTime = document.getElementById('relevant-time');
+        const relevantAbsoluteRow = document.getElementById('relevant-absolute-row');
+        const relevantAbsoluteAt = document.getElementById('post-relevant-at');
+        const relevantAuthor = document.getElementById('post-relevant-author');
         
         if (relevantTime) {
             relevantTime.textContent = formatTimeAgo(post.last_relevant);
             relevantTime.className = 'status-time';
             if (isStale(post.last_relevant)) relevantTime.classList.add('stale');
             if (!post.last_relevant) relevantTime.classList.add('no-data');
+        }
+
+        if (relevantAbsoluteRow && post.last_relevant && post.last_vote_type === 'relevant') {
+            relevantAbsoluteRow.style.display = 'flex';
+            if (relevantAbsoluteAt) relevantAbsoluteAt.textContent = formatYekaterinburgTime(post.last_relevant);
+            if (relevantAuthor) relevantAuthor.textContent = post.last_voter_username || 'Аноним';
+        } else if (relevantAbsoluteRow) {
+            relevantAbsoluteRow.style.display = 'none';
         }
     }
 
@@ -868,10 +879,28 @@ class DPSMap {
             if (isCurrentlyStale && (post.type === 'Нужна помощь' || post.type === 'Чисто')) return;
 
             const isPoPuti = post.comment && post.comment.toLowerCase().includes('попути');
-            const emojiStr = isPoPuti ? '❤️' : this.getEmojiByType(post.type);
-            const tagStr = post.tags && post.tags.length > 0 ? `<br><em>${post.tags.map(t => '#'+t).join(' ')}</em>` : '';
             const isFresh = (timeRelevant > timeIrrelevant) && !isCurrentlyStale;
-            const filterStyle = isPoPuti ? 'none' : (isFresh ? 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' : 'grayscale(100%) opacity(0.4)');
+            
+            // Если пост был недавно (меньше часа назад) отмечен как "Чисто" (irrelevant)
+            const explicitlyCleared = (timeIrrelevant > timeRelevant) && !isStale(timeIrrelevant, 60 * 60 * 1000);
+            
+            let emojiStr = this.getEmojiByType(post.type);
+            if (isPoPuti) emojiStr = '❤️';
+            else if (explicitlyCleared) emojiStr = '✅'; // Показываем галочку, если недавно передали "Чисто"
+            
+            const tagStr = post.tags && post.tags.length > 0 ? `<br><em>${post.tags.map(t => '#'+t).join(' ')}</em>` : '';
+            
+            let filterStyle = 'none';
+            if (!isPoPuti) {
+                if (explicitlyCleared) {
+                    filterStyle = 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))'; // Яркая галочка
+                } else if (isFresh) {
+                    filterStyle = 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))'; // Яркая полиция
+                } else {
+                    filterStyle = 'grayscale(100%) opacity(0.4)'; // Серая неактивная
+                }
+            }
+            
             const markerClass = isPoPuti ? 'marker-heart' : '';
             const sizeValue = this.markerSize;
             const halfSize = sizeValue / 2;
@@ -990,10 +1019,20 @@ class DPSMap {
     showPostDetails(post) {
         this.currentPost = post;
 
+        const timeRelevant = post.last_relevant ? new Date(post.last_relevant).getTime() : new Date(post.created_at).getTime();
+        const timeIrrelevant = post.last_irrelevant ? new Date(post.last_irrelevant).getTime() : 0;
+        const explicitlyCleared = (timeIrrelevant > timeRelevant) && !isStale(timeIrrelevant, 60 * 60 * 1000);
+
         // Reset details
         const typeBadge = document.getElementById('post-type-badge');
-        typeBadge.textContent = post.type || 'ДПС';
-        typeBadge.className = `post-type-badge ${this.getTypeClass(post.type)}`;
+        
+        if (explicitlyCleared) {
+            typeBadge.textContent = 'Чисто';
+            typeBadge.className = `post-type-badge type-clear`;
+        } else {
+            typeBadge.textContent = post.type || 'ДПС';
+            typeBadge.className = `post-type-badge ${this.getTypeClass(post.type)}`;
+        }
 
         const trusted = this.isTrustedUser(post);
         if (trusted) {

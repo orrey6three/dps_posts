@@ -1,6 +1,13 @@
 import postService from '../services/post.service.js';
+import { supabaseAdmin } from '../services/db.service.js';
 
 class PostController {
+  constructor() {
+    this.getPosts = this.getPosts.bind(this);
+    this.createPostByUser = this.createPostByUser.bind(this);
+    this.deleteOwnPost = this.deleteOwnPost.bind(this);
+    this.createPatrolFromBot = this.createPatrolFromBot.bind(this);
+  }
   async getPosts(req, res) {
     try {
       const posts = await postService.getPostsWithStats();
@@ -103,7 +110,8 @@ class PostController {
         return res.status(403).json({ error: 'Недействительный бот-токен' });
       }
 
-      const { street, city = 'Шумиха', comment = '', coords, street_geometry } = req.body;
+      console.log('[BOT] Received request body:', req.body);
+      const { street, city = 'Шумиха', comment = '', coords, street_geometry, author } = req.body;
       if (!street || typeof street !== 'string') {
         return res.status(400).json({ error: 'Поле street обязательно' });
       }
@@ -118,6 +126,91 @@ class PostController {
         ? coords.map(Number)
         : CITY_COORDS[city] || CITY_COORDS.shumikha;
 
+      const resolvedType = ['ДПС', 'Чисто', 'Патруль', 'Нужна помощь'].includes(req.body.type)
+        ? req.body.type
+        : 'Патруль';
+
+      // 1) Handle Proxy User for Telegram Authors
+      const { supabaseAdmin } = await import('../services/db.service.js');
+      let authorUserId = null;
+      let authorDeviceId = 'bot';
+
+      if (author) {
+        // Ensure author starts with @ but only one
+        const formattedAuthor = author.startsWith('@') ? author : `@${author}`;
+        console.log(`[AUTH] Resolving author: ${formattedAuthor}`);
+        // Try to find existing proxy user
+        const { data: existingUser, error: findError } = await supabaseAdmin
+          .from('users')
+          .select('id')
+          .eq('username', formattedAuthor)
+          .single();
+
+        if (existingUser) {
+          authorUserId = existingUser.id;
+          authorDeviceId = existingUser.id;
+        } else {
+          console.log(`[AUTH] Proxy user not found, creating: ${formattedAuthor}`);
+          // Create new proxy user
+          const { data: newUser, error: insertError } = await supabaseAdmin
+            .from('users')
+            .insert([{ username: formattedAuthor, password_hash: 'TELEGRAM_USER', role: 'user' }])
+            .select('id')
+            .single();
+          
+          if (insertError) {
+            console.error(`[AUTH] Error creating proxy user:`, insertError);
+          } else if (newUser) {
+            authorUserId = newUser.id;
+            authorDeviceId = newUser.id;
+          }
+        }
+      } else {
+        console.log(`[AUTH] No author provided in request`);
+      }
+
+      // 2) Check if there is a STATIC post with this address
+      const { data: staticPost } = await supabaseAdmin
+        .from('posts')
+        .select('id')
+        .eq('is_static', true)
+        .ilike('address', street) // case-insensitive match
+        .single();
+        
+      if (staticPost) {
+        // We found a static post! Let's just cast a vote to activate/deactivate it.
+        const voteType = (resolvedType === 'Чисто') ? 'irrelevant' : 'relevant';
+        
+        // Add a vote on behalf of the resolved author ID (or 'bot' fallback)
+        const { error: voteError } = await supabaseAdmin
+          .from('votes')
+          .insert([{
+            post_id: staticPost.id,
+            device_id: authorDeviceId,
+            vote_type: voteType
+          }]);
+        
+        // Update the post's user_id so it shows the last activator as "Creator"
+        if (authorUserId) {
+          await supabaseAdmin
+            .from('posts')
+            .update({ user_id: authorUserId })
+            .eq('id', staticPost.id);
+        }
+          
+        if (voteError) {
+          console.error('[BOT] Error activating static post:', voteError);
+          return res.status(500).json({ error: 'Не удалось активировать статичный пост' });
+        }
+        
+        return res.status(200).json({ 
+          success: true, 
+          message: `Статичный пост "${street}" обновлен (vote: ${voteType})`,
+          post: staticPost 
+        });
+      }
+
+      // 2) If no static post, proceed with fetching geometry and creating a new dynamic post
       let geometry = Array.isArray(street_geometry) ? street_geometry : null;
       let address = `${street}, ${city}`;
 
@@ -126,27 +219,30 @@ class PostController {
         try {
           geometry = await this.fetchStreetGeometry(street, anchor);
         } catch (e) {
-          console.warn('Street geometry resolution failed, will fallback:', e.message);
+          console.warn('[BOT] Street geometry resolution failed:', e.message);
+          // Fallback geometry is not strictly needed for a 'point' marker,
+          // but we might want a small segment or just null
+          geometry = null;
         }
       }
 
-      // If still nothing, draw short 200m line around anchor
-      if (!geometry || geometry.length === 0) {
-        geometry = this.buildFallbackLine(anchor);
-      }
-
       // Choose a representative point for the placemark
-      const [latitude, longitude] = this.pickCenterPoint(geometry);
+      // If no geometry, use anchor (city center) as fallback
+      const [latitude, longitude] = geometry ? this.pickCenterPoint(geometry) : anchor;
+      
+      const titlePrefix = resolvedType === 'Чисто' ? 'Чисто' : resolvedType;
+      
+      console.log(`[BOT] Creating dynamic post. author=${author}, authorUserId=${authorUserId}`);
 
       const post = await postService.createPost(
-        `Патруль: ${street}`,
+        `${titlePrefix}: ${street}`,
         address,
         latitude,
         longitude,
-        'Патруль',
+        resolvedType, 
         comment,
         [],
-        null,
+        authorUserId, // use proxy user instead of null
         geometry
       );
       

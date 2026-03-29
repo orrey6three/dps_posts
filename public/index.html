@@ -42,6 +42,11 @@
                     <span id="post-created-at" class="info-value">—</span>
                     <span class="info-sub">@<span id="post-author-name">username</span></span>
                 </div>
+                <div class="info-row" id="relevant-absolute-row" style="display: none;">
+                    <span class="info-label">Подтверждено:</span>
+                    <span id="post-relevant-at" class="info-value">—</span>
+                    <span class="info-sub" id="post-relevant-author-wrapper">от <span id="post-relevant-author">...</span></span>
+                </div>
                 <div class="info-row" id="last-vote-row">
                     <span class="info-label">Последний голос:</span>
                     <span id="post-last-vote-type" class="info-value">—</span>
@@ -61,14 +66,6 @@
             <div class="post-comment" id="post-comment-container" style="display: none;">
                 <p id="post-comment"></p>
             </div>
-
-            <div class="status-container">
-                <div class="status-item">
-                    <span class="status-label">Последнее подтверждение:</span>
-                    <span id="relevant-time" class="status-time"></span>
-                </div>
-            </div>
-
             <div class="button-container">
                 <button id="btn-relevant" class="vote-button vote-relevant">
                     <i class="fa-solid fa-check"></i>
