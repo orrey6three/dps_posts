@@ -882,11 +882,11 @@ class DPSMap {
             let filterStyle = 'none';
             if (!isPoPuti) {
                 if (explicitlyCleared) {
-                    filterStyle = 'drop-shadow(0 0 10px rgba(34, 197, 94, 0.7)) drop-shadow(0 2px 4px rgba(0,0,0,0.5))'; // Зеленая галочка
+                    filterStyle = 'grayscale(1) opacity(0.4) contrast(0.6)'; // Тусклая для неактуальных
                 } else if (isFresh) {
                     filterStyle = 'drop-shadow(0 0 12px rgba(34, 197, 94, 0.9)) drop-shadow(0 2px 4px rgba(0,0,0,0.5))'; // Яркий зеленый неон
                 } else {
-                    filterStyle = 'grayscale(1) opacity(0.7) contrast(0.8)'; // Четкая серая
+                    filterStyle = 'grayscale(1) opacity(0.7) contrast(0.8)'; // Четкая серая для старых
                 }
             }
             
