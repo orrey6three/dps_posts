@@ -57,7 +57,7 @@ BEGIN
     LEFT JOIN (
         SELECT DISTINCT ON (v.post_id) 
             v.post_id, 
-            COALESCE(u.username, 'Аноним') as username, 
+            COALESCE(u.username, 'Admin') as username, 
             v.vote_type,
             v.created_at
         FROM votes v
@@ -82,7 +82,8 @@ SELECT * FROM (VALUES
     ('Пост ДПС - Победы/Молодёжи', 'Победы/Молодёжи', 55.235038, 63.305525, 'dps', true, 'Статичный пост'),
     ('Пост ДПС - Советская/Гоголя', 'Советская/Гоголя', 55.234348, 63.286332, 'dps', true, 'Статичный пост'),
     ('Пост ДПС - Кольцо', 'Кольцо', 55.254677, 63.253482, 'dps', true, 'Статичный пост'),
-    ('Пост ДПС - Начало Каменской', 'Начало Каменской', 55.240094, 63.272624, 'dps', true, 'Статичный пост')
+    ('Пост ДПС - Начало Каменской', 'Начало Каменской', 55.240094, 63.272624, 'dps', true, 'Статичный пост'),
+    ('Пост ДПС - ХПП', 'ХПП', 55.22284, 63.27348, 'dps', true, 'Элеватор')
 ) AS t(title, address, latitude, longitude, type, is_static, comment)
 WHERE NOT EXISTS (
     SELECT 1 FROM posts p WHERE p.title = t.title AND p.is_static = true

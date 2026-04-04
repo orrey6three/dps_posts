@@ -15,6 +15,11 @@ function generateUUID() {
     });
 }
 
+function formatDisplayUsername(username) {
+    if (!username || username === '—' || username === 'Аноним') return '@Admin';
+    return username.startsWith('@') ? username : `@${username}`;
+}
+
 // Time Formatting
 function formatTimeAgo(timestamp) {
     if (!timestamp) return 'Нет данных';
@@ -280,7 +285,7 @@ class DPSMap {
         if (this.currentUser) {
             authSection.style.display = 'none';
             profileSection.style.display = 'block';
-            document.getElementById('profile-username').textContent = this.currentUser.username;
+            document.getElementById('profile-username').textContent = formatDisplayUsername(this.currentUser.username);
             
             // Show/hide admin elements based on role
             if (this.currentUser.role !== 'admin') {
@@ -681,7 +686,7 @@ class DPSMap {
     updateBottomSheetTimes(post) {
         // Update Creator
         const authorName = document.getElementById('post-author-name');
-        if (authorName) authorName.textContent = post.username || 'Аноним';
+        if (authorName) authorName.textContent = formatDisplayUsername(post.username);
 
         // Update Creation Time (GMT+5)
         const createdAt = document.getElementById('post-created-at');
@@ -691,12 +696,14 @@ class DPSMap {
         const lastVoterName = document.getElementById('post-last-voter-name');
         const lastVoteType = document.getElementById('post-last-vote-type');
         const lastVoteRow = document.getElementById('last-vote-row');
+        const lastVoteAtTime = document.getElementById('post-last-vote-at');
         
         if (post.last_voter_username) {
-            if (lastVoterName) lastVoterName.textContent = post.last_voter_username;
+            if (lastVoterName) lastVoterName.textContent = formatDisplayUsername(post.last_voter_username);
+            if (lastVoteAtTime) lastVoteAtTime.textContent = formatYekaterinburgTime(post.last_activity);
             if (lastVoteType) {
                 const isRelevant = post.last_vote_type === 'relevant';
-                lastVoteType.textContent = isRelevant ? 'Актуально' : 'Не актуально';
+                lastVoteType.textContent = ' ' + (isRelevant ? 'Актуально' : 'Не актуально');
                 lastVoteType.style.color = isRelevant ? 'var(--success)' : 'var(--danger)';
             }
             if (lastVoteRow) lastVoteRow.style.display = 'flex';
@@ -704,25 +711,7 @@ class DPSMap {
             if (lastVoteRow) lastVoteRow.style.display = 'none';
         }
 
-        const relevantTime = document.getElementById('relevant-time');
-        const relevantAbsoluteRow = document.getElementById('relevant-absolute-row');
-        const relevantAbsoluteAt = document.getElementById('post-relevant-at');
-        const relevantAuthor = document.getElementById('post-relevant-author');
-        
-        if (relevantTime) {
-            relevantTime.textContent = formatTimeAgo(post.last_relevant);
-            relevantTime.className = 'status-time';
-            if (isStale(post.last_relevant)) relevantTime.classList.add('stale');
-            if (!post.last_relevant) relevantTime.classList.add('no-data');
-        }
 
-        if (relevantAbsoluteRow && post.last_relevant && post.last_vote_type === 'relevant') {
-            relevantAbsoluteRow.style.display = 'flex';
-            if (relevantAbsoluteAt) relevantAbsoluteAt.textContent = formatYekaterinburgTime(post.last_relevant);
-            if (relevantAuthor) relevantAuthor.textContent = post.last_voter_username || 'Аноним';
-        } else if (relevantAbsoluteRow) {
-            relevantAbsoluteRow.style.display = 'none';
-        }
     }
 
     initMap() {
@@ -893,21 +882,27 @@ class DPSMap {
             let filterStyle = 'none';
             if (!isPoPuti) {
                 if (explicitlyCleared) {
-                    filterStyle = 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))'; // Яркая галочка
+                    filterStyle = 'drop-shadow(0 0 10px rgba(34, 197, 94, 0.7)) drop-shadow(0 2px 4px rgba(0,0,0,0.5))'; // Зеленая галочка
                 } else if (isFresh) {
-                    filterStyle = 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))'; // Яркая полиция
+                    filterStyle = 'drop-shadow(0 0 12px rgba(34, 197, 94, 0.9)) drop-shadow(0 2px 4px rgba(0,0,0,0.5))'; // Яркий зеленый неон
                 } else {
-                    filterStyle = 'grayscale(100%) opacity(0.4)'; // Серая неактивная
+                    filterStyle = 'grayscale(1) opacity(0.7) contrast(0.8)'; // Четкая серая
                 }
             }
             
             const markerClass = isPoPuti ? 'marker-heart' : '';
             const sizeValue = this.markerSize;
             const halfSize = sizeValue / 2;
+            
+            // Custom SVG marker for DPS (aspect ratio 140:275, pin at near bottom @ 262/275)
+            const isDpsMarker = !['Нужна помощь', 'Чисто', 'Вопрос', 'Патруль'].includes(post.type);
+            const layoutStyle = isDpsMarker 
+                ? `width: ${sizeValue}px; height: ${sizeValue * 1.96}px; transform: translate(-50%, -95%);` 
+                : `font-size: ${sizeValue}px; line-height: ${sizeValue}px; transform: translate(-50%, -50%);`;
 
             const CustomIconLayout = ymaps.templateLayoutFactory.createClass(
-                `<div class="${markerClass}" style="font-size: ${sizeValue}px; line-height: ${sizeValue}px; transform: translate(-50%, -50%); cursor: pointer; filter: ${filterStyle}; transition: all 0.3s ease;">
-                    ${emojiStr}
+                `<div class="${markerClass}" style="${layoutStyle} cursor: pointer; filter: ${filterStyle}; transition: all 0.3s ease;">
+                    ${isDpsMarker ? `<img src="/img/marker_dps.svg" style="width:100%; height:100%; object-fit:contain;">` : emojiStr}
                 </div>`
             );
 
@@ -921,7 +916,9 @@ class DPSMap {
                     iconLayout: CustomIconLayout,
                     iconShape: {
                         type: 'Rectangle',
-                        coordinates: [
+                        coordinates: isDpsMarker ? [
+                            [-halfSize, -sizeValue * 1.9], [halfSize, 0]
+                        ] : [
                             [-halfSize, -halfSize], [halfSize, halfSize]
                         ]
                     },

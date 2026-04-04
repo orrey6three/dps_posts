@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 275" width="140" height="275">
+<defs>
+  <filter id="sh" x="-35%" y="-5%" width="170%" height="130%">
+    <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="rgba(5,15,70,0.42)"/>
+  </filter>
+  <clipPath id="carClip">
+    <rect x="14" y="8" width="112" height="170" rx="24"/>
+  </clipPath>
+  <radialGradient id="gloss" cx="35%" cy="20%" r="60%">
+    <stop offset="0%" stop-color="rgba(255,255,255,0.55)"/>
+    <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+  </radialGradient>
+  <radialGradient id="pinGrad" cx="40%" cy="30%" r="70%">
+    <stop offset="0%" stop-color="#c8d0e8"/>
+    <stop offset="100%" stop-color="#9aa0c0"/>
+  </radialGradient>
+</defs>
+
+<g filter="url(#sh)">
+
+  <!-- Pin point -->
+  <path d="M50,175 L70,262 L90,175" fill="url(#pinGrad)"/>
+  <path d="M50,175 L70,262 L90,175" fill="none" stroke="#8890b8" stroke-width="1"/>
+
+  <!-- Car body base -->
+  <rect x="14" y="8" width="112" height="170" rx="24" fill="#f4f5f8"/>
+
+  <!-- All interior elements clipped to car outline -->
+  <g clip-path="url(#carClip)">
+
+    <!-- Front windshield -->
+    <path d="M22,30 L118,30 L114,76 L26,76Z" fill="#1a2845" opacity="0.92"/>
+
+    <!-- A-pillar / roof panel -->
+    <rect x="14" y="76" width="112" height="20" fill="#e2e4ed"/>
+
+    <!-- Blue door stripe -->
+    <rect x="14" y="96" width="112" height="34" fill="#1a3faa"/>
+
+    <!-- Yellow stripe -->
+    <rect x="14" y="130" width="112" height="18" fill="#f5c400"/>
+
+    <!-- Lower body -->
+    <rect x="14" y="148" width="112" height="18" fill="#e8eaf2"/>
+
+    <!-- Rear window -->
+    <path d="M26,166 L114,166 L118,178 L22,178Z" fill="#1a2845" opacity="0.88"/>
+
+    <!-- Center A-pillar line -->
+    <rect x="68" y="30" width="4" height="46" fill="#0e1f3a" opacity="0.5"/>
+
+    <!-- Gloss overlay -->
+    <rect x="0" y="0" width="140" height="195" fill="url(#gloss)"/>
+
+  </g>
+
+  <!-- Car body outline -->
+  <rect x="14" y="8" width="112" height="170" rx="24" fill="none" stroke="#c0c8dc" stroke-width="1.5"/>
+
+  <!-- Lightbar -->
+  <rect x="36" y="11" width="68" height="14" rx="4" fill="#0f1f8a"/>
+  <rect x="40" y="13" width="18" height="10" rx="2" fill="#3355ff"/>
+  <rect x="61" y="13" width="18" height="10" rx="2" fill="#cc2020"/>
+  <rect x="82" y="13" width="18" height="10" rx="2" fill="#3355ff"/>
+  <!-- Lightbar outline -->
+  <rect x="36" y="11" width="68" height="14" rx="4" fill="none" stroke="#1a30cc" stroke-width="0.8"/>
+
+  <!-- Wheels (top-down: narrow vertical rects on sides) -->
+  <!-- Front-left -->
+  <rect x="4" y="38" width="15" height="30" rx="4" fill="#1a1a2e"/>
+  <rect x="6" y="42" width="11" height="22" rx="2" fill="#2a2a40"/>
+  <!-- Front-right -->
+  <rect x="121" y="38" width="15" height="30" rx="4" fill="#1a1a2e"/>
+  <rect x="123" y="42" width="11" height="22" rx="2" fill="#2a2a40"/>
+  <!-- Rear-left -->
+  <rect x="4" y="116" width="15" height="30" rx="4" fill="#1a1a2e"/>
+  <rect x="6" y="120" width="11" height="22" rx="2" fill="#2a2a40"/>
+  <!-- Rear-right -->
+  <rect x="121" y="116" width="15" height="30" rx="4" fill="#1a1a2e"/>
+  <rect x="123" y="120" width="11" height="22" rx="2" fill="#2a2a40"/>
+
+  <!-- Front headlights -->
+  <rect x="18" y="26" width="14" height="6" rx="2" fill="#e8f0ff" opacity="0.9"/>
+  <rect x="108" y="26" width="14" height="6" rx="2" fill="#e8f0ff" opacity="0.9"/>
+
+  <!-- Rear lights -->
+  <rect x="18" y="170" width="14" height="6" rx="2" fill="#ff4444" opacity="0.85"/>
+  <rect x="108" y="170" width="14" height="6" rx="2" fill="#ff4444" opacity="0.85"/>
+
+  <!-- ДПС text -->
+  <text x="70" y="116"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    font-family="Arial Black, Impact, sans-serif"
+    font-weight="900"
+    font-size="16"
+    fill="white"
+    letter-spacing="3">ДПС</text>
+
+</g>
+</svg>
