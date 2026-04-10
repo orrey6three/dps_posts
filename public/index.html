@@ -1,368 +1,542 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#07070a">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#07070a" />
     <title>DPS45 - Знай, где стоят</title>
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <meta name="description" content="Народная карта постов ДПС в Шумихе, Курганская область">
-    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=%YANDEX_KEY%" type="text/javascript"></script>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta
+      name="description"
+      content="Народная карта постов ДПС в Шумихе, Курганская область"
+    />
+    <script
+      src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=%YANDEX_KEY%"
+      type="text/javascript"
+    ></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-    <link rel="stylesheet" href="/css/style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
     <div id="map"></div>
     <div class="map-atmosphere" aria-hidden="true"></div>
     <div class="map-brand" aria-hidden="true">
-        <div class="brand-pill">
-            <span class="brand-dot"></span>
-            <span class="brand-title">DPS45</span>
-            <span class="brand-divider"></span>
-            <span class="brand-tag">Live карта</span>
-        </div>
-        <div class="brand-subtitle">Народная карта постов ДПС</div>
+      <div class="brand-pill">
+        <span class="brand-dot"></span>
+        <span class="brand-title">DPS45</span>
+        <span class="brand-divider"></span>
+        <span class="brand-tag">Live карта</span>
+      </div>
+      <div class="brand-subtitle">Народная карта постов ДПС</div>
     </div>
-    <a href="/admin" class="admin-map-btn" id="admin-map-btn" title="Админ панель">
-        <i class="fa-solid fa-shield-halved"></i> Админ
+    <a
+      href="/admin"
+      class="admin-map-btn"
+      id="admin-map-btn"
+      title="Админ панель"
+    >
+      <i class="fa-solid fa-shield-halved"></i> Админ
     </a>
     <div id="loading" class="loading-overlay">
-        <div class="loading-spinner"></div>
-        <p>Загрузка карты...</p>
+      <div class="loading-spinner"></div>
+      <p>Загрузка карты...</p>
     </div>
     <div id="bottom-sheet" class="bottom-sheet">
-        <div class="bottom-sheet-handle"></div>
-        <div id="post-details" class="post-details">
-            <div class="author-voter-info">
-                <div class="info-row">
-                    <span class="info-label">Создано:</span>
-                    <span id="post-created-at" class="info-value">—</span>
-                    <span class="info-sub"><span id="post-author-name">username</span></span>
-                </div>
-                <div class="info-row" id="last-vote-row">
-                    <span class="info-label">Последний голос:</span>
-                    <span id="post-last-vote-at" class="info-value"></span>
-                    <span id="post-last-vote-type" class="info-value">—</span>
-                    <span class="info-sub"><span id="post-last-voter-name">—</span></span>
-                </div>
-            </div>
-            <div class="post-header">
-                <div class="post-type-badge type-dps" id="post-type-badge">ДПС</div>
-            </div>
-            
-            <h2 id="post-title" style="display:none;"></h2>
-            <p id="post-address" class="address-text" style="display: none;"></p>
-            
-            <div id="post-tags-container" class="tags-container">
-            </div>
-
-            <div class="post-comment" id="post-comment-container" style="display: none;">
-                <p id="post-comment"></p>
-            </div>
-            <div class="button-container">
-                <button id="btn-relevant" class="vote-button vote-relevant">
-                    <i class="fa-solid fa-check"></i>
-                    <span>Актуально</span>
-                </button>
-                <button id="btn-irrelevant" class="vote-button vote-irrelevant">
-                    <i class="fa-solid fa-xmark"></i>
-                    <span>Не актуально</span>
-                </button>
-            </div>
-            <div id="vote-message" class="vote-message"></div>
-            <button id="btn-delete-post" class="btn-delete-own" style="display:none;">
-                <i class="fa-solid fa-trash"></i> Удалить мою метку
-            </button>
+      <div class="bottom-sheet-handle"></div>
+      <div id="post-details" class="post-details">
+        <div class="author-voter-info">
+          <div class="info-row">
+            <span class="info-label">Создано:</span>
+            <span id="post-created-at" class="info-value">—</span>
+            <span class="info-sub"
+              ><span id="post-author-name">username</span></span
+            >
+          </div>
+          <div class="info-row" id="last-vote-row">
+            <span class="info-label">Последний голос:</span>
+            <span id="post-last-vote-at" class="info-value"></span>
+            <span id="post-last-vote-type" class="info-value">—</span>
+            <span class="info-sub"
+              ><span id="post-last-voter-name">—</span></span
+            >
+          </div>
         </div>
+        <div class="post-header">
+          <div class="post-type-badge type-dps" id="post-type-badge">ДПС</div>
+        </div>
+
+        <h2 id="post-title" style="display: none"></h2>
+        <p id="post-address" class="address-text" style="display: none"></p>
+
+        <div id="post-tags-container" class="tags-container"></div>
+
+        <div
+          class="post-comment"
+          id="post-comment-container"
+          style="display: none"
+        >
+          <p id="post-comment"></p>
+        </div>
+        <div class="button-container">
+          <button id="btn-relevant" class="vote-button vote-relevant">
+            <i class="fa-solid fa-check"></i>
+            <span>Актуально</span>
+          </button>
+          <button id="btn-irrelevant" class="vote-button vote-irrelevant">
+            <i class="fa-solid fa-xmark"></i>
+            <span>Не актуально</span>
+          </button>
+        </div>
+        <div id="vote-message" class="vote-message"></div>
+        <button
+          id="btn-delete-post"
+          class="btn-delete-own"
+          style="display: none"
+        >
+          <i class="fa-solid fa-trash"></i> Удалить мою метку
+        </button>
+      </div>
     </div>
 
     <div id="add-post-drawer" class="drawer-modal">
-        <div class="drawer-header">
-            <button class="drawer-close" id="btn-close-add">
-                <i class="fa-solid fa-arrow-left"></i>
-            </button>
-            <h2>Добавить метку</h2>
-        </div>
-        <div class="drawer-content">
-            <form id="add-post-form">
-                <div class="form-group type-selector">
-                    <div class="type-btn active" data-type="ДПС" style="--btn-color: #f43f5e">ДПС</div>
-                    <div class="type-btn" data-type="Патруль" style="--btn-color: #3b82f6">Патруль</div>
-                    <div class="type-btn" data-type="Нужна помощь" style="--btn-color: #eab308">SOS</div>
-                    <div class="type-btn" data-type="Вопрос" style="--btn-color: #38bdf8">!</div>
-                    <div class="type-btn" data-type="Чисто" style="--btn-color: #22c55e">Чисто</div>
-                </div>
-                
-                <input type="hidden" id="post-type" value="ДПС">
+      <div class="drawer-header">
+        <button class="drawer-close" id="btn-close-add">
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        <h2>Добавить метку</h2>
+      </div>
+      <div class="drawer-content">
+        <form id="add-post-form">
+          <div class="form-group type-selector">
+            <div
+              class="type-btn active"
+              data-type="ДПС"
+              style="--btn-color: #f43f5e"
+            >
+              ДПС
+            </div>
+            <div
+              class="type-btn"
+              data-type="Патруль"
+              style="--btn-color: #3b82f6"
+            >
+              Патруль
+            </div>
+            <div
+              class="type-btn"
+              data-type="Нужна помощь"
+              style="--btn-color: #eab308"
+            >
+              SOS
+            </div>
+            <div
+              class="type-btn"
+              data-type="Вопрос"
+              style="--btn-color: #38bdf8"
+            >
+              !
+            </div>
+            <div
+              class="type-btn"
+              data-type="Чисто"
+              style="--btn-color: #22c55e"
+            >
+              Чисто
+            </div>
+          </div>
 
-                <div class="form-group">
-                    <label class="form-label text-muted">Быстрые теги:</label>
-                    <div id="tags-selector" class="tags-selector">
-                    </div>
-                </div>
+          <input type="hidden" id="post-type" value="ДПС" />
 
-                <div class="form-group">
-                    <label class="form-label text-muted">Описание</label>
-                    <textarea id="post-new-comment" placeholder="До 125 символов (необязательно)" maxlength="125" rows="2"></textarea>
-                </div>
-                
-                <button type="submit" class="btn btn-primary btn-full submit-btn">Опубликовать</button>
-            </form>
-        </div>
+          <div class="form-group">
+            <label class="form-label text-muted">Быстрые теги:</label>
+            <div id="tags-selector" class="tags-selector"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label text-muted">Описание</label>
+            <textarea
+              id="post-new-comment"
+              placeholder="До 125 символов (необязательно)"
+              maxlength="125"
+              rows="2"
+            ></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full submit-btn">
+            Опубликовать
+          </button>
+        </form>
+      </div>
     </div>
 
     <div id="settings-drawer" class="drawer-modal">
-        <div class="drawer-header">
-            <button class="drawer-close" id="btn-close-settings">
-                <i class="fa-solid fa-arrow-left"></i>
+      <div class="drawer-header">
+        <button class="drawer-close" id="btn-close-settings">
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        <h2>Настройки</h2>
+      </div>
+      <div class="drawer-content">
+        <div id="auth-section" class="auth-section">
+          <p class="text-secondary mb-4">
+            Войдите, чтобы добавлять метки и участвовать в жизни сообщества.
+          </p>
+          <div class="auth-tabs">
+            <button class="auth-tab active" data-tab="login">Вход</button>
+            <button class="auth-tab" data-tab="register">Регистрация</button>
+          </div>
+
+          <form id="login-form" class="auth-form active-form">
+            <div class="form-group">
+              <input
+                type="text"
+                id="login-username"
+                placeholder="Имя пользователя"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <input
+                type="password"
+                id="login-password"
+                placeholder="Пароль"
+                required
+              />
+            </div>
+            <button type="submit" class="btn btn-primary btn-full mb-3">
+              Войти
             </button>
-            <h2>Настройки</h2>
+          </form>
+
+          <form id="register-form" class="auth-form" style="display: none">
+            <div class="form-group">
+              <input
+                type="text"
+                id="register-username"
+                placeholder="Придумайте никнейм"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <input
+                type="password"
+                id="register-password"
+                placeholder="Пароль"
+                required
+              />
+            </div>
+            <button type="submit" class="btn btn-primary btn-full mb-3">
+              Регистрация
+            </button>
+          </form>
         </div>
-        <div class="drawer-content">
-            
-            <div id="auth-section" class="auth-section">
-                <p class="text-secondary mb-4">Войдите, чтобы добавлять метки и участвовать в жизни сообщества.</p>
-                <div class="auth-tabs">
-                    <button class="auth-tab active" data-tab="login">Вход</button>
-                    <button class="auth-tab" data-tab="register">Регистрация</button>
-                </div>
-                
-                <form id="login-form" class="auth-form active-form">
-                    <div class="form-group">
-                        <input type="text" id="login-username" placeholder="Имя пользователя" required>
-                    </div>
-                    <div class="form-group">
-                        <input type="password" id="login-password" placeholder="Пароль" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-full mb-3">Войти</button>
-                </form>
 
-                <form id="register-form" class="auth-form" style="display:none;">
-                    <div class="form-group">
-                        <input type="text" id="register-username" placeholder="Придумайте никнейм" required>
-                    </div>
-                    <div class="form-group">
-                        <input type="password" id="register-password" placeholder="Пароль" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-full mb-3">Регистрация</button>
-                </form>
+        <div id="profile-section" class="profile-section" style="display: none">
+          <div class="profile-card mb-4">
+            <div class="profile-avatar"><i class="fa-solid fa-user"></i></div>
+            <div class="profile-info">
+              <h3 id="profile-username">Username</h3>
+              <span class="profile-role">Участник</span>
             </div>
+          </div>
 
-            <div id="profile-section" class="profile-section" style="display: none;">
-                <div class="profile-card mb-4">
-                    <div class="profile-avatar"><i class="fa-solid fa-user"></i></div>
-                    <div class="profile-info">
-                        <h3 id="profile-username">Username</h3>
-                        <span class="profile-role">Участник</span>
-                    </div>
-                </div>
-                
-                <div class="settings-list mb-4">
-                    <a href="/admin" class="settings-item" id="admin-link">
-                        <div class="settings-icon"><i class="fa-solid fa-shield-halved"></i></div>
-                        <span>Панель управления</span>
-                        <i class="fa-solid fa-chevron-right chevron"></i>
-                    </a>
-                    <div class="settings-item danger-item" id="btn-logout">
-                        <div class="settings-icon"><i class="fa-solid fa-arrow-right-from-bracket"></i></div>
-                        <span>Выйти из аккаунта</span>
-                    </div>
-                </div>
+          <div class="settings-list mb-4">
+            <a href="/admin" class="settings-item" id="admin-link">
+              <div class="settings-icon">
+                <i class="fa-solid fa-shield-halved"></i>
+              </div>
+              <span>Панель управления</span>
+              <i class="fa-solid fa-chevron-right chevron"></i>
+            </a>
+            <div class="settings-item danger-item" id="btn-logout">
+              <div class="settings-icon">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+              </div>
+              <span>Выйти из аккаунта</span>
             </div>
-
-            <div class="settings-list mb-4">
-                <div class="settings-item">
-                    <div class="settings-info">
-                        <i class="fa-solid fa-expand"></i>
-                        <span id="marker-size-text">Размер меток (Средний)</span>
-                    </div>
-                    <div class="size-selector">
-                        <button class="size-btn" data-size="24" title="Маленький">S</button>
-                        <button class="size-btn active" data-size="32" title="Средний">M</button>
-                        <button class="size-btn" data-size="44" title="Большой">L</button>
-                    </div>
-                </div>
-
-                <div class="settings-item">
-                    <div class="settings-info">
-                        <i class="fa-solid fa-city"></i>
-                        <span id="city-selector-text">Ваш город</span>
-                    </div>
-                    <div class="city-selector-menu">
-                        <button class="city-nav-btn" data-city="shchuchye">Щучье</button>
-                        <button class="city-nav-btn active" data-city="shumikha">Шумиха</button>
-                        <button class="city-nav-btn" data-city="mishkino">Мишкино</button>
-                    </div>
-                </div>
-
-                <div class="settings-item" id="theme-toggle">
-                    <div class="settings-icon">
-                        <i class="fa-solid fa-moon moon-icon"></i>
-                        <i class="fa-solid fa-sun sun-icon" style="display:none;"></i>
-                    </div>
-                    <span id="theme-text">Светлая тема</span>
-                    <div class="theme-status-tag">Выкл</div>
-                </div>
-
-                <a href="mailto:orstudiocorp@gmail.com" class="settings-item email-item">
-                    <div class="settings-icon" style="color: #ea4335;">
-                        <i class="fa-solid fa-envelope"></i>
-                    </div>
-                    <span>Связаться с разработчиком</span>
-                    <div class="theme-status-tag active" style="background: rgba(234, 67, 53, 0.1); color: #ea4335;">orstudiocorp@gmail.com</div>
-                </a>
-            </div>
-
-            <div class="settings-list mb-4">
-                <div class="settings-item" id="notify-toggle">
-                    <div class="settings-icon"><i class="fa-solid fa-bell"></i></div>
-                    <div class="settings-info" style="flex:1;">
-                        <span>Push-уведомления</span>
-                        <div id="notify-sub" class="text-muted" style="font-size: 0.75rem;">Радиус 1 км</div>
-                    </div>
-                    <div id="notify-status" class="theme-status-tag">Выкл</div>
-                </div>
-
-                <div id="notify-config" style="display:none; padding: 0 10px 10px;">
-                    <label class="form-label text-muted" style="font-size: 0.75rem; margin-top: 10px;">Радиус оповещения (км):</label>
-                    <div class="radius-selector mb-3">
-                        <button class="radius-btn active" data-radius="1">1</button>
-                        <button class="radius-btn" data-radius="5">5</button>
-                        <button class="radius-btn" data-radius="15">15</button>
-                        <button class="radius-btn" data-radius="50">50</button>
-                    </div>
-
-                    <div class="quiet-hours-grid">
-                        <div class="time-input-group">
-                            <label class="form-label text-muted">Тихий режим с:</label>
-                            <div class="time-field-wrapper">
-                                <i class="fa-regular fa-clock"></i>
-                                <input type="time" id="quiet-start" value="23:00" step="60">
-                            </div>
-                        </div>
-                        <div class="time-input-group">
-                            <label class="form-label text-muted">Тихий режим до:</label>
-                            <div class="time-field-wrapper">
-                                <i class="fa-regular fa-clock"></i>
-                                <input type="time" id="quiet-end" value="07:00" step="60">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+          </div>
         </div>
+
+        <div class="settings-list mb-4">
+          <div class="settings-item">
+            <div class="settings-info">
+              <i class="fa-solid fa-expand"></i>
+              <span id="marker-size-text">Размер меток (Средний)</span>
+            </div>
+            <div class="size-selector">
+              <button class="size-btn" data-size="24" title="Маленький">
+                S
+              </button>
+              <button class="size-btn active" data-size="32" title="Средний">
+                M
+              </button>
+              <button class="size-btn" data-size="44" title="Большой">L</button>
+            </div>
+          </div>
+
+          <div class="settings-item">
+            <div class="settings-info">
+              <i class="fa-solid fa-city"></i>
+              <span id="city-selector-text">Ваш город</span>
+            </div>
+            <div class="city-selector-menu">
+              <button class="city-nav-btn" data-city="shchuchye">Щучье</button>
+              <button class="city-nav-btn active" data-city="shumikha">
+                Шумиха
+              </button>
+              <button class="city-nav-btn" data-city="mishkino">Мишкино</button>
+            </div>
+          </div>
+
+          <div class="settings-item" id="theme-toggle">
+            <div class="settings-icon">
+              <i class="fa-solid fa-moon moon-icon"></i>
+              <i class="fa-solid fa-sun sun-icon" style="display: none"></i>
+            </div>
+            <span id="theme-text" style="flex: 1; margin-left: 10px"
+              >Светлая тема</span
+            >
+            <div class="theme-status-tag">Выкл</div>
+          </div>
+
+          <div
+            class="settings-item"
+            id="notify-toggle"
+            style="border-top: 1px solid rgba(255, 255, 255, 0.05)"
+          >
+            <div class="settings-icon"><i class="fa-solid fa-bell"></i></div>
+            <div class="settings-info" style="flex: 1; margin-left: 10px">
+              <span>Push-уведомления</span>
+              <div
+                id="notify-sub"
+                class="text-muted"
+                style="font-size: 0.75rem"
+              >
+                Радиус 1 км
+              </div>
+            </div>
+            <div id="notify-status" class="theme-status-tag">Выкл</div>
+          </div>
+
+          <div id="notify-config" style="display: none; padding: 0 15px 15px">
+            <label
+              class="form-label text-muted"
+              style="font-size: 0.75rem; margin-top: 10px; display: block"
+              >Радиус оповещения (км):</label
+            >
+            <div
+              class="radius-selector mb-3"
+              style="display: flex; gap: 5px; margin-top: 5px"
+            >
+              <button class="radius-btn active" data-radius="1">1</button>
+              <button class="radius-btn" data-radius="5">5</button>
+              <button class="radius-btn" data-radius="15">15</button>
+              <button class="radius-btn" data-radius="50">50</button>
+            </div>
+
+            <div
+              class="quiet-hours-grid"
+              style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px"
+            >
+              <div class="time-input-group">
+                <label class="form-label text-muted" style="font-size: 0.7rem"
+                  >Тихий режим с:</label
+                >
+                <input
+                  type="time"
+                  id="quiet-start"
+                  value="23:00"
+                  style="
+                    width: 100%;
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    color: #fff;
+                    border-radius: 8px;
+                    padding: 5px;
+                  "
+                />
+              </div>
+              <div class="time-input-group">
+                <label class="form-label text-muted" style="font-size: 0.7rem"
+                  >До:</label
+                >
+                <input
+                  type="time"
+                  id="quiet-end"
+                  value="07:00"
+                  style="
+                    width: 100%;
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    color: #fff;
+                    border-radius: 8px;
+                    padding: 5px;
+                  "
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="community-drawer" class="drawer-modal">
-        <div class="drawer-header">
-            <button class="drawer-close" id="btn-close-community">
-                <i class="fa-solid fa-arrow-left"></i>
-            </button>
-            <h2>Где общаемся</h2>
+      <div class="drawer-header">
+        <button class="drawer-close" id="btn-close-community">
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        <h2>Где общаемся</h2>
+      </div>
+      <div class="drawer-content">
+        <div class="community-intro">
+          Мы на связи тут — заходите общаться, задавать вопросы и помогать друг
+          другу.
         </div>
-        <div class="drawer-content">
-            <div class="community-intro">
-                Мы на связи тут — заходите общаться, задавать вопросы и помогать друг другу.
+        <div class="community-list">
+          <a
+            class="community-item"
+            href="https://t.me/poputishumikha"
+            target="_blank"
+            rel="noopener"
+          >
+            <div class="community-icon telegram">
+              <i class="fa-brands fa-telegram"></i>
             </div>
-            <div class="community-list">
-                <a class="community-item" href="https://t.me/poputishumikha" target="_blank" rel="noopener">
-                    <div class="community-icon telegram"><i class="fa-brands fa-telegram"></i></div>
-                    <div class="community-info">
-                        <div class="community-title">Попути Шумиха</div>
-                        <div class="community-sub">Основной чат</div>
-                    </div>
-                    <i class="fa-solid fa-arrow-up-right-from-square community-arrow"></i>
-                </a>
-                <a class="community-item" href="https://t.me/poputibaraholkashumiha" target="_blank" rel="noopener">
-                    <div class="community-icon telegram"><i class="fa-brands fa-telegram"></i></div>
-                    <div class="community-info">
-                        <div class="community-title">Барахолка</div>
-                        <div class="community-sub">Покупка и продажа</div>
-                    </div>
-                    <i class="fa-solid fa-arrow-up-right-from-square community-arrow"></i>
-                </a>
-                <a class="community-item" href="https://t.me/poputiboltalkaznakomstvashumiha" target="_blank" rel="noopener">
-                    <div class="community-icon telegram"><i class="fa-brands fa-telegram"></i></div>
-                    <div class="community-info">
-                        <div class="community-title">Болталка и знакомства</div>
-                        <div class="community-sub">Свободное общение</div>
-                    </div>
-                    <i class="fa-solid fa-arrow-up-right-from-square community-arrow"></i>
-                </a>
-                <a class="community-item" href="https://max.ru/join/ShSh5UaeEe4mJ_cZIGDVxlIyu6ZxdxBDaxizzErU5MI" target="_blank" rel="noopener">
-                    <div class="community-icon max"><span>MX</span></div>
-                    <div class="community-info">
-                        <div class="community-title">Макс</div>
-                        <div class="community-sub">Новый канал</div>
-                    </div>
-                    <i class="fa-solid fa-arrow-up-right-from-square community-arrow"></i>
-                </a>
-                <a class="community-item" href="https://vk.me/join/N_VdBTD_ZEZHaXdSDFWno18RCXYXk/fU0To=" target="_blank" rel="noopener">
-                    <div class="community-icon vk"><i class="fa-brands fa-vk"></i></div>
-                    <div class="community-info">
-                        <div class="community-title">ВКонтакте</div>
-                        <div class="community-sub">Группа и чаты</div>
-                    </div>
-                    <i class="fa-solid fa-arrow-up-right-from-square community-arrow"></i>
-                </a>
+            <div class="community-info">
+              <div class="community-title">Попути Шумиха</div>
+              <div class="community-sub">Основной чат</div>
             </div>
+            <i
+              class="fa-solid fa-arrow-up-right-from-square community-arrow"
+            ></i>
+          </a>
+          <a
+            class="community-item"
+            href="https://t.me/poputibaraholkashumiha"
+            target="_blank"
+            rel="noopener"
+          >
+            <div class="community-icon telegram">
+              <i class="fa-brands fa-telegram"></i>
+            </div>
+            <div class="community-info">
+              <div class="community-title">Барахолка</div>
+              <div class="community-sub">Покупка и продажа</div>
+            </div>
+            <i
+              class="fa-solid fa-arrow-up-right-from-square community-arrow"
+            ></i>
+          </a>
+          <a
+            class="community-item"
+            href="https://t.me/poputiboltalkaznakomstvashumiha"
+            target="_blank"
+            rel="noopener"
+          >
+            <div class="community-icon telegram">
+              <i class="fa-brands fa-telegram"></i>
+            </div>
+            <div class="community-info">
+              <div class="community-title">Болталка и знакомства</div>
+              <div class="community-sub">Свободное общение</div>
+            </div>
+            <i
+              class="fa-solid fa-arrow-up-right-from-square community-arrow"
+            ></i>
+          </a>
+          <a
+            class="community-item"
+            href="https://max.ru/join/ShSh5UaeEe4mJ_cZIGDVxlIyu6ZxdxBDaxizzErU5MI"
+            target="_blank"
+            rel="noopener"
+          >
+            <div class="community-icon max"><span>MX</span></div>
+            <div class="community-info">
+              <div class="community-title">Макс</div>
+              <div class="community-sub">Новый канал</div>
+            </div>
+            <i
+              class="fa-solid fa-arrow-up-right-from-square community-arrow"
+            ></i>
+          </a>
+          <a
+            class="community-item"
+            href="https://vk.me/join/N_VdBTD_ZEZHaXdSDFWno18RCXYXk/fU0To="
+            target="_blank"
+            rel="noopener"
+          >
+            <div class="community-icon vk"><i class="fa-brands fa-vk"></i></div>
+            <div class="community-info">
+              <div class="community-title">ВКонтакте</div>
+              <div class="community-sub">Группа и чаты</div>
+            </div>
+            <i
+              class="fa-solid fa-arrow-up-right-from-square community-arrow"
+            ></i>
+          </a>
         </div>
+      </div>
     </div>
 
     <nav class="bottom-nav">
-        <a href="#" class="nav-item active" id="nav-map">
-            <i class="fa-solid fa-map-location-dot"></i>
-            <span>Карта</span>
-        </a>
-        <a href="#" class="nav-item add-btn" id="nav-add">
-            <div class="add-icon-wrapper">
-                <i class="fa-solid fa-plus"></i>
-            </div>
-        </a>
-        <a href="#" class="nav-item" id="nav-settings">
-            <i class="fa-solid fa-gear"></i>
-            <span>Настройки</span>
-        </a>
-        <a href="#" class="nav-item" id="nav-community">
-            <i class="fa-solid fa-comments"></i>
-            <span>Сообщества</span>
-        </a>
+      <a href="#" class="nav-item active" id="nav-map">
+        <i class="fa-solid fa-map-location-dot"></i>
+        <span>Карта</span>
+      </a>
+      <a href="#" class="nav-item add-btn" id="nav-add">
+        <div class="add-icon-wrapper">
+          <i class="fa-solid fa-plus"></i>
+        </div>
+      </a>
+      <a href="#" class="nav-item" id="nav-settings">
+        <i class="fa-solid fa-gear"></i>
+        <span>Настройки</span>
+      </a>
+      <a href="#" class="nav-item" id="nav-community">
+        <i class="fa-solid fa-comments"></i>
+        <span>Сообщества</span>
+      </a>
     </nav>
     <div id="toast-container" class="toast-container"></div>
     <div id="confirm-modal" class="confirm-modal">
-        <div class="confirm-content">
-            <h3 id="confirm-title">Подтверждение</h3>
-            <p id="confirm-message">Вы уверены?</p>
-            <div class="confirm-actions">
-                <button id="confirm-cancel" class="btn-secondary">Отмена</button>
-                <button id="confirm-ok" class="btn-primary">Да, продолжить</button>
-            </div>
+      <div class="confirm-content">
+        <h3 id="confirm-title">Подтверждение</h3>
+        <p id="confirm-message">Вы уверены?</p>
+        <div class="confirm-actions">
+          <button id="confirm-cancel" class="btn-secondary">Отмена</button>
+          <button id="confirm-ok" class="btn-primary">Да, продолжить</button>
         </div>
+      </div>
     </div>
     <div id="city-modal" class="modal-overlay">
-        <div class="city-selection-card">
-            <h2>Выберите ваш город</h2>
-            <p>Это поможет нам показать актуальные метки в вашем районе</p>
-            <div class="city-list">
-                <button class="city-btn" data-city="shchuchye">Щучье</button>
-                <button class="city-btn" data-city="shumikha">Шумиха</button>
-                <button class="city-btn" data-city="mishkino">Мишкино</button>
-            </div>
+      <div class="city-selection-card">
+        <h2>Выберите ваш город</h2>
+        <p>Это поможет нам показать актуальные метки в вашем районе</p>
+        <div class="city-list">
+          <button class="city-btn" data-city="shchuchye">Щучье</button>
+          <button class="city-btn" data-city="shumikha">Шумиха</button>
+          <button class="city-btn" data-city="mishkino">Мишкино</button>
         </div>
+      </div>
     </div>
     <div id="drawer-overlay" class="modal-overlay"></div>
 
     <script src="./js/app.js"></script>
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(() => {});
-            });
-        }
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js").catch(() => {});
+        });
+      }
     </script>
-</body>
+  </body>
 </html>

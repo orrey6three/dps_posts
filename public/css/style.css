@@ -1,8 +1,8 @@
 /* DPS45 — Atlas UI */
-@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
 
 :root {
-    --font-display: 'Unbounded', 'Manrope', sans-serif;
+    --font-display: 'Space Grotesk', 'Manrope', sans-serif;
     --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
     --bg-deep: #0a0b10;
@@ -672,8 +672,8 @@ a {
     bottom: 0;
     left: 50%;
     transform: translate(-50%, 120%);
-    width: calc(100% - 24px);
-    max-width: 500px;
+    width: min(calc(100% - 20px), 460px);
+    max-width: 460px;
     background: var(--bg-surface);
     z-index: 10001;
     border-radius: var(--radius-2xl);
@@ -697,13 +697,13 @@ a {
 .drawer-header {
     display: flex;
     align-items: center;
-    padding: 20px 24px;
+    padding: 16px 18px;
     border-bottom: 1px solid var(--border-subtle);
 }
 
 .drawer-header h2 {
     font-family: var(--font-display);
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     font-weight: 600;
     margin-left: 16px;
 }
@@ -729,9 +729,14 @@ a {
 }
 
 .drawer-content {
-    padding: 24px;
+    padding: 18px;
     overflow-y: auto;
     flex: 1;
+}
+
+.auth-section > .text-secondary {
+    margin-bottom: 14px;
+    line-height: 1.45;
 }
 
 .modal-overlay {
@@ -756,8 +761,8 @@ a {
 .type-selector {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 24px;
+    gap: 10px;
+    margin-bottom: 18px;
 }
 
 .type-btn {
@@ -782,27 +787,27 @@ a {
 
 /* Forms */
 .form-group {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .form-label {
     display: block;
-    font-size: 0.9rem;
+    font-size: 0.82rem;
     font-weight: 500;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     color: var(--text-secondary);
 }
 
 .form-group input,
 .form-group textarea {
     width: 100%;
-    padding: 14px;
+    padding: 11px 14px;
     border-radius: var(--radius-md);
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border-strong);
     color: var(--text-primary);
     font-family: inherit;
-    font-size: 1rem;
+    font-size: 0.95rem;
     transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -815,9 +820,9 @@ a {
 
 /* Buttons */
 .btn {
-    padding: 12px 20px;
+    padding: 11px 18px;
     border-radius: var(--radius-lg);
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
@@ -863,7 +868,7 @@ a {
 .auth-tabs {
     display: flex;
     border-bottom: 1px solid var(--border-subtle);
-    margin-bottom: 24px;
+    margin-bottom: 18px;
 }
 
 .auth-tab {
@@ -871,8 +876,8 @@ a {
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    padding: 12px;
-    font-size: 1rem;
+    padding: 10px 12px;
+    font-size: 0.95rem;
     font-weight: 500;
     cursor: pointer;
     border-bottom: 2px solid transparent;
@@ -924,21 +929,21 @@ a {
 .settings-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 7px;
 }
 
 .settings-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 14px;
+    padding: 10px 12px;
     background: var(--bg-elevated);
     border-radius: var(--radius-lg);
     text-decoration: none;
     color: var(--text-primary);
     font-weight: 500;
     cursor: pointer;
-    min-height: 56px;
+    min-height: 50px;
     border: 1px solid var(--border-subtle);
     transition: transform var(--transition-fast), border-color var(--transition-fast);
 }
@@ -949,8 +954,8 @@ a {
 }
 
 .settings-icon {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.06);
     display: flex;
@@ -1096,7 +1101,7 @@ a {
 .settings-info {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
 .city-selector-menu {
