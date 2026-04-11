@@ -1,4 +1,4 @@
-import { createPost } from "@/server/posts";
+import { createPost, updatePost } from "@/server/posts";
 import { supabaseAdmin } from "@/server/db";
 import { env } from "@/server/env";
 import { HttpError } from "@/server/errors";
@@ -43,6 +43,17 @@ export async function createPatrolFromBot(input: BotInput, token?: string | null
     return { mode: "static", post: staticPost };
   }
 
+  const existingDynamic = await findRecentDynamicPost(input.street, city);
+  if (existingDynamic) {
+    const updated = await updatePost(existingDynamic.id, {
+      type,
+      title: `${type === "Чисто" ? "Чисто" : type}: ${input.street}`,
+      comment: input.comment ?? existingDynamic.comment,
+      user_id: author.userId || undefined
+    });
+    return { mode: "dynamic", post: updated, updated: true };
+  }
+
   const geometry = input.street_geometry?.length
     ? input.street_geometry
     : await fetchStreetGeometry(input.street, anchor);
@@ -82,9 +93,25 @@ async function findStaticPost(street: string) {
     .from("posts")
     .select("id")
     .eq("is_static", true)
-    .ilike("address", street)
+    .ilike("address", `%${street}%`)
     .single();
   return data as { id: string } | null;
+}
+
+async function findRecentDynamicPost(street: string, city: string) {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { data } = await supabaseAdmin
+    .from("posts")
+    .select("id, comment")
+    .eq("is_static", false)
+    .eq("type", "ДПС") // Мы заменяем только активные ДПС
+    .ilike("address", `%${street}%`)
+    .gt("created_at", oneHourAgo)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data as { id: string; comment: string } | null;
 }
 
 async function fetchStreetGeometry(street: string, anchor: [number, number]) {
