@@ -429,3 +429,64 @@ body::before {
     .admin-header-inner { flex-direction: column; align-items: flex-start; }
     .admin-header-actions { width: 100%; justify-content: flex-start; }
 }
+
+/* Shadowban Button */
+.btn-shadowban {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-shadowban.active {
+    background: rgba(255, 61, 90, 0.15);
+    color: var(--accent);
+    border-color: rgba(255, 61, 90, 0.3);
+}
+
+.btn-shadowban:hover {
+    border-color: var(--accent);
+}
+
+/* Report Cards */
+.report-card {
+    margin-bottom: 12px;
+    border-left: 4px solid var(--accent-2);
+}
+
+.report-card.resolved {
+    border-left-color: var(--success);
+    opacity: 0.8;
+}
+
+.report-card.dismissed {
+    border-left-color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.report-reason {
+    margin: 8px 0;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.report-status-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.report-status-badge.resolved { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+.report-status-badge.dismissed { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+.btn-icon.success { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+.btn-icon.success:hover { background: var(--success); color: white; }

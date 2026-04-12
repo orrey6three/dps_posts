@@ -80,6 +80,7 @@
         <div class="admin-tabs-inner">
             <button class="admin-tab active" data-tab="posts"><i class="fa-solid fa-location-pin"></i> Метки</button>
             <button class="admin-tab" data-tab="users"><i class="fa-solid fa-users"></i> Пользователи</button>
+            <button class="admin-tab" data-tab="reports"><i class="fa-solid fa-triangle-exclamation"></i> Жалобы</button>
         </div>
     </div>
 
@@ -107,12 +108,22 @@
                             <th>Роль</th>
                             <th>Меток</th>
                             <th>Зарегистрирован</th>
+                            <th>Статус</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody id="users-tbody"></tbody>
                 </table>
             </div>
+        </div>
+
+        <div id="tab-reports" class="tab-content hidden">
+            <div class="section-toolbar">
+                <h2 class="section-title">Жалобы на фейки</h2>
+                <button id="refresh-reports-btn" class="action-btn secondary"><i class="fa-solid fa-rotate-right"></i> Обновить</button>
+            </div>
+            <div id="reports-loading" class="admin-loading hidden"><div class="admin-spinner"></div></div>
+            <div id="reports-list" class="reports-list"></div>
         </div>
     </main>
 </div>

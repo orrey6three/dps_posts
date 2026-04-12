@@ -619,6 +619,31 @@ a {
     border-color: rgba(239, 68, 68, 0.7);
 }
 
+.btn-report-fake {
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px 16px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-report-fake:hover {
+    background: rgba(245, 158, 11, 0.08);
+    color: #fbbf24;
+    border-color: rgba(245, 158, 11, 0.4);
+}
+
 .kindness-badge {
     margin-top: 12px;
     padding: 10px 14px;

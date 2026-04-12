@@ -408,6 +408,33 @@ class DPSMap {
 
         document.getElementById('btn-delete-post').addEventListener('click', () => this.deleteOwnPost());
 
+        document.getElementById('btn-report-post').addEventListener('click', async () => {
+            if (!this.currentPost) return;
+            
+            const reason = await this.showPrompt('Жалоба на фейк', 'Опишите причину (например, "Тут пусто" или "Фейк"):');
+            if (!reason) return;
+
+            try {
+                const response = await fetch('/api/reports', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        postId: this.currentPost.post_id,
+                        reason: reason
+                    })
+                });
+
+                if (response.ok) {
+                    this.showSuccess('Жалоба отправлена. Спасибо за бдительность!');
+                } else {
+                    const data = await response.json();
+                    this.showError(data.error || 'Ошибка при отправке жалобы');
+                }
+            } catch (error) {
+                this.showError('Ошибка сети');
+            }
+        });
+
         // Forms logic
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1261,6 +1288,41 @@ class DPSMap {
                 okBtn.removeEventListener('click', onOk);
                 cancelBtn.removeEventListener('click', onCancel);
                 resolve(false);
+            };
+
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', onCancel);
+        });
+    }
+
+    showPrompt(title, message) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('prompt-modal');
+            const titleEl = document.getElementById('prompt-title');
+            const msgEl = document.getElementById('prompt-message');
+            const input = document.getElementById('prompt-input');
+            const okBtn = document.getElementById('prompt-ok');
+            const cancelBtn = document.getElementById('prompt-cancel');
+
+            titleEl.textContent = title;
+            msgEl.textContent = message;
+            input.value = '';
+            modal.classList.add('active');
+            input.focus();
+
+            const onOk = () => {
+                const val = input.value.trim();
+                modal.classList.remove('active');
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                resolve(val);
+            };
+
+            const onCancel = () => {
+                modal.classList.remove('active');
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                resolve(null);
             };
 
             okBtn.addEventListener('click', onOk);

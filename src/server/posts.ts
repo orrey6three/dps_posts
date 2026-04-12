@@ -33,11 +33,20 @@ export async function cleanupOldPosts() {
     .lt("created_at", oneHourAgo);
 }
 
-export async function getPostsWithStats() {
+export async function getPostsWithStats(currentUserId?: string | null) {
   await cleanupOldPosts();
   const { data, error } = await supabase.rpc("get_post_stats");
   if (error) throw new HttpError(500, "Не удалось загрузить посты");
-  return (data ?? []) as PostRow[];
+  
+  const posts = (data ?? []) as PostRow[];
+  
+  // Filtering logic:
+  // 1. Post is not shadowbanned -> Everyone sees it.
+  // 2. Post IS shadowbanned -> Only the author sees it.
+  return posts.filter(post => {
+    if (!post.is_shadowbanned) return true;
+    return post.user_id === currentUserId;
+  });
 }
 
 export async function createPost(input: PostInput, userId?: string | null) {

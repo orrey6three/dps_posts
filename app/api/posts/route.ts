@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPost, getPostsWithStats } from "@/server/posts";
 import { routeError } from "@/server/errors";
-import { requireUser } from "@/server/session";
-import type { PostInput } from "@/types/models";
+import { getRequestUser, requireUser } from "@/server/session";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const posts = await getPostsWithStats();
+    const user = getRequestUser(request);
+    const posts = await getPostsWithStats(user?.id);
     return NextResponse.json({ posts });
   } catch (error) {
     return routeError(error);

@@ -86,6 +86,7 @@ class AdminPanel {
         
         if (tabId === 'posts') this.loadPosts();
         if (tabId === 'users') this.loadUsers();
+        if (tabId === 'reports') this.loadReports();
     }
 
     async checkAuth() {
@@ -119,6 +120,7 @@ class AdminPanel {
         document.getElementById('cancel-modal')?.addEventListener('click', () => this.hidePostModal());
         document.getElementById('post-form')?.addEventListener('submit', (e) => this.handlePostSubmit(e));
         document.getElementById('refresh-users-btn')?.addEventListener('click', () => this.loadUsers());
+        document.getElementById('refresh-reports-btn')?.addEventListener('click', () => this.loadReports());
 
         // Modal close on ESC
         document.addEventListener('keydown', (e) => {
@@ -138,8 +140,25 @@ class AdminPanel {
             if (action === 'delete') this.showConfirmDelete('post', id, btn.getAttribute('data-title'));
         });
 
-        // User deletion
+        // Event delegation for reports
+        document.getElementById('reports-list')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-report-resolve, .btn-report-dismiss');
+            if (!btn) return;
+            const id = btn.getAttribute('data-id');
+            const action = btn.classList.contains('btn-report-resolve') ? 'resolve' : 'dismiss';
+            this.handleReportAction(id, action);
+        });
+
+        // Event delegation for users (shadowban)
         document.getElementById('users-tbody')?.addEventListener('click', (e) => {
+            const sbBtn = e.target.closest('.btn-shadowban');
+            if (sbBtn) {
+                const id = sbBtn.getAttribute('data-id');
+                const currentStatus = sbBtn.getAttribute('data-status') === 'true';
+                this.toggleShadowban(id, currentStatus);
+                return;
+            }
+
             const btn = e.target.closest('.btn-delete-user');
             if (!btn) return;
             const id = btn.getAttribute('data-id');
@@ -290,6 +309,13 @@ class AdminPanel {
                 <td>${u.post_count}</td>
                 <td>${new Date(u.created_at).toLocaleDateString()}</td>
                 <td>
+                    ${u.role !== 'admin' ? `
+                        <button class="btn-shadowban ${u.is_shadowbanned ? 'active' : ''}" data-id="${u.id}" data-status="${u.is_shadowbanned}">
+                            ${u.is_shadowbanned ? '<i class="fa-solid fa-user-slash"></i> В бане' : '<i class="fa-solid fa-user-check"></i> Ок'}
+                        </button>
+                    ` : '—'}
+                </td>
+                <td>
                     ${u.role !== 'admin' ? `<button class="btn-icon delete btn-delete-user" data-id="${u.id}" data-username="${u.username}"><i class="fa-solid fa-user-minus"></i></button>` : ''}
                 </td>
             </tr>
@@ -336,6 +362,71 @@ class AdminPanel {
     escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
     showLoginScreen() { document.getElementById('login-screen').classList.remove('hidden'); document.getElementById('admin-panel').classList.add('hidden'); }
     showAdminPanel() { document.getElementById('login-screen').classList.add('hidden'); document.getElementById('admin-panel').classList.remove('hidden'); }
+
+    async loadReports() {
+        const loading = document.getElementById('reports-loading');
+        if (loading) loading.classList.remove('hidden');
+        try {
+            const res = await fetch('/admin/api/reports', { credentials: 'include' });
+            const data = await res.json();
+            this.renderReports(data.reports || []);
+        } finally { if (loading) loading.classList.add('hidden'); }
+    }
+
+    renderReports(reports) {
+        const list = document.getElementById('reports-list');
+        if (!list) return;
+        if (reports.length === 0) { list.innerHTML = '<div class="empty-state">Жалоб нет</div>'; return; }
+        
+        list.innerHTML = reports.map(r => `
+            <div class="post-card report-card ${r.status}">
+                <div class="post-card-header">
+                    <div class="post-card-info">
+                        <h3>Жалоба на ${r.post ? r.post.type : 'удаленную метку'}</h3>
+                        <p class="report-reason">Причина: <strong>${this.escapeHtml(r.reason)}</strong></p>
+                        <p class="muted">От: ${r.user_id || 'Аноним'} | ${new Date(r.created_at).toLocaleString()}</p>
+                    </div>
+                    <div class="post-card-actions">
+                        ${r.status === 'pending' ? `
+                            <button class="btn-icon success btn-report-resolve" data-id="${r.id}" title="Подтвердить (Метка фейк)"><i class="fa-solid fa-check"></i></button>
+                            <button class="btn-icon delete btn-report-dismiss" data-id="${r.id}" title="Отклонить"><i class="fa-solid fa-xmark"></i></button>
+                        ` : `<span class="report-status-badge ${r.status}">${r.status}</span>`}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async handleReportAction(id, action) {
+        const status = action === 'resolve' ? 'resolved' : 'dismissed';
+        try {
+            const res = await fetch(`/admin/api/reports/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+                credentials: 'include'
+            });
+            if (res.ok) {
+                this.showToast('success', 'Статус обновлен');
+                this.loadReports();
+            }
+        } catch (e) { this.showToast('error', 'Ошибка'); }
+    }
+
+    async toggleShadowban(userId, currentStatus) {
+        try {
+            const res = await fetch(`/admin/api/users/${userId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_shadowbanned: !currentStatus }),
+                credentials: 'include'
+            });
+            if (res.ok) {
+                this.showToast('success', 'Статус бана изменен');
+                this.loadUsers();
+            }
+        } catch (e) { this.showToast('error', 'Ошибка'); }
+    }
 }
 
 new AdminPanel();

@@ -17,7 +17,7 @@ export async function getDashboardStats() {
 export async function getUsers() {
   const { data, error } = await supabaseAdmin
     .from("users")
-    .select("id, username, role, created_at")
+    .select("id, username, role, created_at, is_shadowbanned")
     .order("created_at", { ascending: false });
   if (error) throw new HttpError(500, "Не удалось загрузить пользователей");
   const users = data ?? [];
@@ -30,6 +30,14 @@ export async function getUsers() {
       return { ...user, post_count: count ?? 0 };
     })
   );
+}
+
+export async function shadowbanUser(userId: string, isShadowbanned: boolean) {
+  const { error } = await supabaseAdmin
+    .from("users")
+    .update({ is_shadowbanned: isShadowbanned })
+    .eq("id", userId);
+  if (error) throw new HttpError(500, "Не удалось изменить статус бана");
 }
 
 export async function deleteUser(userId: string) {

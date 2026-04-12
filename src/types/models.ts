@@ -7,6 +7,7 @@ export interface AuthUser {
   username: string;
   role: "user" | "admin";
   created_at?: string;
+  is_shadowbanned?: boolean;
 }
 
 export interface JwtUser {
@@ -48,4 +49,17 @@ export interface PostRow {
   last_vote_type: VoteType | null;
   is_static: boolean;
   street_geometry: number[][] | null;
+  is_shadowbanned: boolean;
+}
+
+export type ReportStatus = "pending" | "resolved" | "dismissed";
+
+export interface Report {
+  id: string;
+  post_id: string;
+  user_id: string | null;
+  reason: string;
+  created_at: string;
+  status: ReportStatus;
+  post?: PostRow;
 }

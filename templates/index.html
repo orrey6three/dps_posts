@@ -104,6 +104,10 @@
         >
           <i class="fa-solid fa-trash"></i> Удалить мою метку
         </button>
+
+        <button id="btn-report-post" class="btn-report-fake">
+          <i class="fa-solid fa-triangle-exclamation"></i> Пожаловаться на фейк
+        </button>
       </div>
     </div>
 
@@ -514,6 +518,30 @@
         <div class="confirm-actions">
           <button id="confirm-cancel" class="btn-secondary">Отмена</button>
           <button id="confirm-ok" class="btn-primary">Да, продолжить</button>
+        </div>
+      </div>
+    </div>
+    <div id="prompt-modal" class="confirm-modal">
+      <div class="confirm-content">
+        <h3 id="prompt-title">Введите данные</h3>
+        <p id="prompt-message"></p>
+        <div class="form-group" style="margin: 15px 0">
+          <textarea
+            id="prompt-input"
+            rows="2"
+            style="
+              width: 100%;
+              background: rgba(255, 255, 255, 0.05);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              color: #fff;
+              border-radius: 8px;
+              padding: 10px;
+            "
+          ></textarea>
+        </div>
+        <div class="confirm-actions">
+          <button id="prompt-cancel" class="btn-secondary">Отмена</button>
+          <button id="prompt-ok" class="btn-primary">Отправить</button>
         </div>
       </div>
     </div>
