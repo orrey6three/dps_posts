@@ -18,6 +18,7 @@ type BotInput = {
   street_geometry?: number[][];
   type?: MarkerType;
   author?: string;
+  date?: number;
 };
 
 export async function createPatrolFromBot(input: BotInput, token?: string | null) {
@@ -49,7 +50,8 @@ export async function createPatrolFromBot(input: BotInput, token?: string | null
       type,
       title: `${type === "Чисто" ? "Чисто" : type}: ${input.street}`,
       comment: input.comment ?? existingDynamic.comment,
-      user_id: author.userId || undefined
+      user_id: author.userId || undefined,
+      created_at: input.date ? new Date(input.date * 1000).toISOString() : undefined
     });
     return { mode: "dynamic", post: updated, updated: true };
   }
@@ -68,7 +70,8 @@ export async function createPatrolFromBot(input: BotInput, token?: string | null
       type,
       comment: input.comment ?? "",
       tags: [],
-      street_geometry: geometry ?? undefined
+      street_geometry: geometry ?? undefined,
+      created_at: input.date ? new Date(input.date * 1000).toISOString() : undefined
     },
     author.userId
   );

@@ -60,6 +60,7 @@ export async function createPost(input: PostInput, userId?: string | null) {
     if (author?.id) payload.user_id = userId;
   }
   if (input.street_geometry?.length) payload.street_geometry = input.street_geometry;
+  if (input.created_at) payload.created_at = input.created_at;
 
   const { data, error } = await supabaseAdmin.from("posts").insert([payload]).select().single();
   if (error || !data) {

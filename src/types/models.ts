@@ -24,6 +24,7 @@ export interface PostInput {
   comment?: string;
   tags?: string[];
   street_geometry?: number[][];
+  created_at?: string;
 }
 
 export interface PostRow {
