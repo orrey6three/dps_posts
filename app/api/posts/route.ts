@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createPost, getPostsWithStats } from "@/server/posts";
 import { routeError } from "@/server/errors";
 import { getRequestUser, requireUser } from "@/server/session";
+import type { PostInput } from "@/types/models";
 
 export const dynamic = "force-dynamic";
 
