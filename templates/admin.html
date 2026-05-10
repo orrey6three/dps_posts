@@ -88,7 +88,12 @@
         <div id="tab-posts" class="tab-content active">
             <div class="section-toolbar">
                 <h2 class="section-title">Метки на карте</h2>
-                <button id="add-post-btn" class="action-btn primary"><i class="fa-solid fa-plus"></i> Добавить</button>
+                <div class="section-toolbar-actions">
+                    <button type="button" id="clear-all-votes-btn" class="action-btn secondary votes-clear-all" title="Удалить все голоса из базы">
+                        <i class="fa-solid fa-broom"></i> Очистить все голоса
+                    </button>
+                    <button id="add-post-btn" class="action-btn primary"><i class="fa-solid fa-plus"></i> Добавить</button>
+                </div>
             </div>
             <div id="admin-loading" class="admin-loading hidden"><div class="admin-spinner"></div></div>
             <div id="posts-list" class="posts-list"></div>

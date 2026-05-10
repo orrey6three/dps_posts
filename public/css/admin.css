@@ -242,6 +242,7 @@ body::before {
 /* Main Content */
 .admin-main { max-width: 1060px; margin: 36px auto 60px; padding: 0 20px; }
 .section-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
+.section-toolbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .section-title { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; }
 
 .admin-loading {
@@ -381,6 +382,7 @@ body::before {
 .btn-icon { width: 36px; height: 36px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
 .btn-icon.edit { background: rgba(56, 189, 248, 0.15); color: var(--accent-2); }
 .btn-icon.delete { background: rgba(255, 61, 90, 0.15); color: var(--accent); }
+.btn-icon.clear-votes { background: rgba(245, 158, 11, 0.18); color: #f59e0b; }
 .btn-icon:hover { transform: scale(1.08); }
 
 .confirm-text {

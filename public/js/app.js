@@ -61,11 +61,16 @@ const HASHTAGS_MAP = {
     'Чисто': []
 };
 
+/** С этого числа точечных меток включаем кластеризацию (меньше DOM и быстрее pan/zoom на телефонах). */
+const CLUSTER_MIN_MARKERS = 28;
+
 // Yandex Maps Application
 class DPSMap {
     constructor() {
         this.map = null;
         this.markers = {};
+        this.markerClusterer = null;
+        this.mapResizeRaf = null;
         this.posts = [];
         this.currentPost = null;
         this.deviceId = getDeviceId();
@@ -210,8 +215,6 @@ class DPSMap {
         const themeText = document.getElementById('theme-text');
         const themeTag = document.querySelector('.theme-status-tag');
         
-        console.log('Applying theme:', theme);
-        
         if (theme === 'dark') {
             if (themeText) themeText.textContent = 'Тёмная тема';
             if (themeTag) {
@@ -229,11 +232,9 @@ class DPSMap {
 
     updateMapTheme(theme) {
         if (!this.map) {
-            console.log('Map not ready for theme update');
             return;
         }
         const mapType = theme === 'dark' ? 'yandex#hybrid' : 'yandex#map';
-        console.log('Setting map type to:', mapType);
         this.map.setType(mapType);
     }
     
@@ -607,7 +608,6 @@ class DPSMap {
                     document.getElementById('add-post-form').reset();
                     this.selectedTags = []; // clear tags
                     await this.loadPosts();
-                    this.renderMarkers();
                     this.newMarkerCoords = null; // reset coords
                     this.showSuccess('Метка успешно добавлена');
                 } else {
@@ -651,10 +651,12 @@ class DPSMap {
 
     async loadPosts() {
         try {
-            const response = await fetch('/api/posts');
+            const response = await fetch('/api/posts', { cache: 'no-store' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
-            this.posts = data.posts;
+            this.posts = Array.isArray(data.posts) ? data.posts : [];
             this.buildReputation();
+            if (this.map) this.renderMarkers();
         } catch (error) {
             console.error('Error loading posts:', error);
             this.showError('Не удалось загрузить посты');
@@ -674,7 +676,6 @@ class DPSMap {
                 { event: 'INSERT', schema: 'public', table: 'posts' },
                 async () => {
                     await this.loadPosts();
-                    this.renderMarkers();
                 }
             )
             // Listen for DELETED POSTS
@@ -683,7 +684,6 @@ class DPSMap {
                 { event: 'DELETE', schema: 'public', table: 'posts' },
                 async () => {
                     await this.loadPosts();
-                    this.renderMarkers();
                 }
             )
             // Listen for NEW VOTES
@@ -692,7 +692,6 @@ class DPSMap {
                 { event: 'INSERT', schema: 'public', table: 'votes' },
                 async (payload) => {
                     await this.loadPosts();
-                    this.renderMarkers();
 
                     if (this.currentPost && this.currentPost.post_id === payload.new.post_id) {
                         const updatedPost = this.posts.find(p => p.post_id === payload.new.post_id);
@@ -703,11 +702,7 @@ class DPSMap {
                     }
                 }
             )
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    console.log('Realtime sync active: posts & votes');
-                }
-            });
+            .subscribe(() => {});
     }
 
     updateBottomSheetTimes(post) {
@@ -766,7 +761,7 @@ class DPSMap {
                 center: defaultCenter || this.CITY_COORDS.shumikha,
                 zoom: 12,
                 type: initialMapType,
-                controls: ['geolocationControl']
+                controls: ['zoomControl', 'geolocationControl']
             }, {
                 searchControlProvider: 'yandex#search',
                 suppressMapOpenBlock: true,
@@ -780,6 +775,27 @@ class DPSMap {
             if (!savedCity) {
                 this.showCityModal(this.CITY_COORDS);
             }
+
+            const fitMapViewport = () => {
+                if (!this.map) return;
+                try {
+                    this.map.container.fitToViewport();
+                } catch (e) {}
+            };
+
+            const scheduleFit = () => {
+                if (this.mapResizeRaf) cancelAnimationFrame(this.mapResizeRaf);
+                this.mapResizeRaf = requestAnimationFrame(fitMapViewport);
+            };
+
+            window.addEventListener('resize', scheduleFit);
+            window.addEventListener('orientationchange', () => setTimeout(fitMapViewport, 280));
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) return;
+                fitMapViewport();
+                void this.loadPosts();
+            });
 
             this.renderMarkers();
             this.hideLoading();
@@ -814,7 +830,6 @@ class DPSMap {
             setTimeout(() => {
                 if (localStorage.getItem('dps45_city')) return; // Priority to saved city
 
-                console.log('Attempting auto-geolocation...');
                 ymaps.geolocation.get({
                     provider: 'browser',
                     mapStateAutoApply: true
@@ -824,9 +839,7 @@ class DPSMap {
                         this.map.setCenter(coords, 14, { duration: 1500, flying: true });
                         this.showNotification('Местоположение определено', 'success');
                     }
-                }).catch((err) => {
-                    console.log('Browser geolocation failed, trying Yandex...', err);
-                    // Fallback to Yandex (IP based usually)
+                }).catch(() => {
                     ymaps.geolocation.get({
                         provider: 'yandex',
                         autoReverseGeocode: true
@@ -837,17 +850,28 @@ class DPSMap {
                         }
                     });
                 });
-            }, 1000); 
+            }, 1000);
         });
     }
 
     renderMarkers() {
+        if (!this.map) return;
+
+        if (this.markerClusterer) {
+            try {
+                this.map.geoObjects.remove(this.markerClusterer);
+            } catch (e) {}
+            this.markerClusterer = null;
+        }
+
         Object.values(this.markers).forEach(marker => {
             if (!marker) return;
             if (Array.isArray(marker)) {
                 marker.forEach(obj => obj && this.map.geoObjects.remove(obj));
             } else {
-                this.map.geoObjects.remove(marker);
+                try {
+                    this.map.geoObjects.remove(marker);
+                } catch (e) {}
             }
         });
         this.markers = {};
@@ -886,6 +910,8 @@ class DPSMap {
                 this.heatmap.setMap(this.map);
             });
         }
+
+        const placemarksBatch = [];
 
         filtered.forEach(post => {
             const timeRelevant = post.last_relevant ? new Date(post.last_relevant).getTime() : new Date(post.created_at).getTime();
@@ -1017,9 +1043,26 @@ class DPSMap {
                 this.showPostDetails(post);
             });
 
-            this.map.geoObjects.add(placemark);
+            placemarksBatch.push(placemark);
             this.markers[post.post_id] = placemark;
         });
+
+        if (!this.filters.heat && placemarksBatch.length >= CLUSTER_MIN_MARKERS) {
+            try {
+                this.markerClusterer = new ymaps.Clusterer({
+                    preset: 'islands#invertedBlueClusterIcons',
+                    groupByCoordinates: false,
+                    gridSize: 64,
+                    clusterDisableClickZoom: false
+                });
+                this.markerClusterer.add(placemarksBatch);
+                this.map.geoObjects.add(this.markerClusterer);
+            } catch (e) {
+                placemarksBatch.forEach((pm) => this.map.geoObjects.add(pm));
+            }
+        } else {
+            placemarksBatch.forEach((pm) => this.map.geoObjects.add(pm));
+        }
     }
 
     getEmojiByType(type) {
@@ -1069,24 +1112,34 @@ class DPSMap {
         const markerKey = 'patrol_' + post.post_id;
         this.markers[markerKey] = [patrolLine, patrolLineBlue];
 
-        // Animation logic for "moving" lights - faster and smoother
-        let offset = 0;
-        const animInterval = setInterval(() => {
-            if (!this.markers[markerKey]) {
-                clearInterval(animInterval);
-                return;
-            }
-            offset = (offset + 2) % 40; // Double step for speed
-            patrolLine.options.set('strokeOffset', offset);
-            patrolLineBlue.options.set('strokeOffset', offset + 10);
-        }, 100);
+        const prefersReduced =
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const mobileSlow =
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(max-width: 640px)').matches;
+        const patrolTickMs = prefersReduced ? 0 : mobileSlow ? 200 : 100;
+
+        let animInterval = null;
+        if (patrolTickMs > 0) {
+            let offset = 0;
+            animInterval = setInterval(() => {
+                if (!this.markers[markerKey]) {
+                    clearInterval(animInterval);
+                    return;
+                }
+                offset = (offset + 2) % 40;
+                patrolLine.options.set('strokeOffset', offset);
+                patrolLineBlue.options.set('strokeOffset', offset + 10);
+            }, patrolTickMs);
+        }
 
         // Auto-remove after 5 minutes (300,000 ms)
         setTimeout(() => {
             if (this.map.geoObjects.indexOf(patrolLine) !== -1) this.map.geoObjects.remove(patrolLine);
             if (this.map.geoObjects.indexOf(patrolLineBlue) !== -1) this.map.geoObjects.remove(patrolLineBlue);
             delete this.markers[markerKey];
-            clearInterval(animInterval);
+            if (animInterval) clearInterval(animInterval);
         }, 5 * 60 * 1000);
     }
 
@@ -1204,7 +1257,6 @@ class DPSMap {
                     localStorage.setItem('dps45_voted_posts', JSON.stringify(this.votedPosts));
                 }
                 await this.loadPosts();
-                this.renderMarkers();
                 const updatedPost = this.posts.find(p => p.post_id === this.currentPost.post_id);
                 if (updatedPost) {
                     this.currentPost = updatedPost;
@@ -1254,7 +1306,6 @@ class DPSMap {
                 this.showSuccess('Метка удалена');
                 // Refresh map
                 await this.loadPosts();
-                this.renderMarkers();
             } else {
                 let errorMsg = 'Не удалось удалить метку';
                 try {
@@ -1553,6 +1604,7 @@ class DPSMap {
     }
 
     checkNearbyNotifications() {
+        if (document.hidden) return;
         if (!this.notificationOptions.enabled) return;
         if (!this.userLocation) return;
         if (Notification.permission !== 'granted') return;

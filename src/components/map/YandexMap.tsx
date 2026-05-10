@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { CITY_COORDS, MAP_AREA_LIMITS } from "@/lib/constants";
+import { CITY_COORDS, CLUSTER_MIN_MARKERS, MAP_AREA_LIMITS } from "@/lib/constants";
 import { isExpired } from "@/lib/format";
 import { loadYandexMaps } from "@/lib/yandex";
 import type { PostRow } from "@/types/models";
@@ -17,6 +17,11 @@ type Props = {
   onMarkerClick: (post: PostRow) => void;
 };
 
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 export function YandexMap({
   apiKey,
   posts,
@@ -30,16 +35,21 @@ export function YandexMap({
   const hostRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const objectsRef = useRef<any[]>([]);
+  const clusterRef = useRef<any>(null);
+  const viewportCleanupRef = useRef<(() => void) | null>(null);
   const addModeRef = useRef(addMode);
   const onMapClickRef = useRef(onMapClick);
+  const onMarkerClickRef = useRef(onMarkerClick);
 
   useEffect(() => {
     addModeRef.current = addMode;
     onMapClickRef.current = onMapClick;
-  }, [addMode, onMapClick]);
+    onMarkerClickRef.current = onMarkerClick;
+  }, [addMode, onMapClick, onMarkerClick]);
 
   useEffect(() => {
     let mounted = true;
+
     loadYandexMaps(apiKey)
       .then((ymaps) => {
         if (!mounted || !hostRef.current || mapRef.current) return;
@@ -63,10 +73,31 @@ export function YandexMap({
           if (!addModeRef.current) return;
           onMapClickRef.current(event.get("coords"));
         });
+
+        const fitViewport = () => {
+          try {
+            mapRef.current?.container?.fitToViewport();
+          } catch {
+            /* noop */
+          }
+        };
+        const scheduleFit = () => requestAnimationFrame(fitViewport);
+        window.addEventListener("resize", scheduleFit);
+        const onVis = () => {
+          if (!document.hidden) fitViewport();
+        };
+        document.addEventListener("visibilitychange", onVis);
+
+        viewportCleanupRef.current = () => {
+          window.removeEventListener("resize", scheduleFit);
+          document.removeEventListener("visibilitychange", onVis);
+        };
       })
       .catch(console.error);
     return () => {
       mounted = false;
+      viewportCleanupRef.current?.();
+      viewportCleanupRef.current = null;
       if (mapRef.current) mapRef.current.destroy();
       mapRef.current = null;
     };
@@ -86,8 +117,18 @@ export function YandexMap({
     const map = mapRef.current;
     if (!map || !window.ymaps) return;
 
-    objectsRef.current.forEach((obj) => map.geoObjects.remove(obj));
+    objectsRef.current.forEach((obj) => {
+      try {
+        map.geoObjects.remove(obj);
+      } catch {
+        /* noop */
+      }
+    });
     objectsRef.current = [];
+    clusterRef.current = null;
+
+    const placemarks: any[] = [];
+    const reduced = prefersReducedMotion();
 
     posts.forEach((post) => {
       if (post.type === "Патруль" && post.street_geometry?.length) {
@@ -100,7 +141,7 @@ export function YandexMap({
       if (isExpired(relevantTime, ttl)) return;
 
       const sizeStr = Math.max(markerSize, 36);
-      const htmlLayout = buildMarkerHTML(post.type, sizeStr);
+      const htmlLayout = buildMarkerHTML(post.type, sizeStr, !reduced);
       const layout = window.ymaps.templateLayoutFactory.createClass(htmlLayout);
       const placemark = new window.ymaps.Placemark(
         [post.latitude, post.longitude],
@@ -121,23 +162,46 @@ export function YandexMap({
       placemark.events.add("click", (e: any) => {
         e.preventDefault();
         e.stopPropagation();
-        onMarkerClick(post);
+        onMarkerClickRef.current(post);
       });
-      map.geoObjects.add(placemark);
-      objectsRef.current.push(placemark);
+      placemarks.push(placemark);
     });
-  }, [posts, markerSize, onMarkerClick]);
+
+    const Clusterer = window.ymaps.Clusterer;
+    if (Clusterer && placemarks.length >= CLUSTER_MIN_MARKERS) {
+      try {
+        clusterRef.current = new Clusterer({
+          preset: "islands#invertedBlueClusterIcons",
+          groupByCoordinates: false,
+          gridSize: 64,
+          clusterDisableClickZoom: false
+        });
+        clusterRef.current.add(placemarks);
+        map.geoObjects.add(clusterRef.current);
+        objectsRef.current.push(clusterRef.current);
+      } catch {
+        placemarks.forEach((pm) => {
+          map.geoObjects.add(pm);
+          objectsRef.current.push(pm);
+        });
+      }
+    } else {
+      placemarks.forEach((pm) => {
+        map.geoObjects.add(pm);
+        objectsRef.current.push(pm);
+      });
+    }
+  }, [posts, markerSize]);
 
   return <div ref={hostRef} className={`map-host ${addMode ? "map-host--add" : ""}`} />;
 }
 
-function buildMarkerHTML(type: string, markerSize: number) {
+function buildMarkerHTML(type: string, markerSize: number, showPulse: boolean) {
   let themeClass = "marker-default";
   let svg = "";
 
   if (type === "Патруль") {
     themeClass = "marker-patrol";
-    // Sleek police car / radar icon 
     svg = `<svg class="marker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 16h-4m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a2 2 0 0 0-1.6-.8H9.3a2 2 0 0 0-1.6.8L5 11l-5.16.86a1 1 0 0 0-.84.99V16h3m10 0a2 2 0 1 0-4 0m4 0a2 2 0 1 1-4 0m-7 0a2 2 0 1 0-4 0m4 0a2 2 0 1 1-4 0"/><path d="M12 4v3m-3-3h6"/></svg>`;
   } else if (type === "Нужна помощь") {
     themeClass = "marker-help";
@@ -153,9 +217,11 @@ function buildMarkerHTML(type: string, markerSize: number) {
     svg = `<svg class="marker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
   }
 
+  const pulse = showPulse ? `<div class="marker-pulse"></div>` : "";
+
   return `
     <div class="custom-marker ${themeClass}" style="width: ${markerSize}px; height: ${markerSize}px;">
-      <div class="marker-pulse"></div>
+      ${pulse}
       ${svg}
     </div>
   `;

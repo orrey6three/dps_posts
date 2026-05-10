@@ -69,6 +69,8 @@
 body {
     font-family: var(--font-body);
     overflow: hidden;
+    min-height: 100vh;
+    min-height: 100dvh;
     background: var(--bg-deep);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
@@ -94,19 +96,30 @@ a {
     color: inherit;
 }
 
-/* Map */
+/* Map — на телефонах убираем тяжёлый CSS filter (композитинг GPU) */
 #map {
     position: fixed;
     inset: 0;
     width: 100%;
     height: 100vh;
+    height: 100dvh;
     z-index: 1;
     filter: saturate(1.05) contrast(1.02) brightness(0.98);
     transition: filter 0.4s ease;
+    touch-action: none;
 }
 
 [data-theme="light"] #map {
     filter: saturate(1.1) contrast(1.02) brightness(1.02);
+}
+
+@media (max-width: 768px) {
+    #map {
+        filter: none;
+    }
+    [data-theme="light"] #map {
+        filter: saturate(1.02) contrast(1.01);
+    }
 }
 
 #map.placement-active {
@@ -786,7 +799,8 @@ a {
 .admin-map-btn {
     position: fixed;
     top: max(16px, env(safe-area-inset-top));
-    left: 16px;
+    right: 16px;
+    left: auto;
     z-index: 999;
     background: var(--bg-card);
     backdrop-filter: blur(14px) saturate(1.3);
@@ -1847,7 +1861,8 @@ a {
 
     .admin-map-btn {
         top: max(12px, env(safe-area-inset-top));
-        left: 12px;
+        right: 12px;
+        left: auto;
         padding: 8px 12px;
         font-size: 0.72rem;
     }
@@ -1864,9 +1879,21 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    * {
+    .marker-pulse,
+    .marker-heart,
+    .map-atmosphere,
+    .vote-relevant::before {
         animation: none !important;
+    }
+
+    .custom-marker {
         transition: none !important;
+    }
+
+    .bottom-sheet,
+    .drawer-modal,
+    .toast {
+        transition-duration: 0.01ms !important;
     }
 }
 

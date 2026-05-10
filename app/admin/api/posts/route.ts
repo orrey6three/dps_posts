@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllPosts, createPost } from "@/server/posts";
+import { resolveAdminPostAuthorId } from "@/server/admin";
+import { createPost, getAllPosts } from "@/server/posts";
 import { requireAdmin } from "@/server/session";
 import { routeError } from "@/server/errors";
-import { supabaseAdmin } from "@/server/db";
 import type { PostInput } from "@/types/models";
-import { getPostVoteStats } from "@/server/votes";
+import { getVoteCountsBulk } from "@/server/votes";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +12,16 @@ export async function GET(request: NextRequest) {
   try {
     requireAdmin(request);
     const posts = await getAllPosts();
-    const postsWithStats = await Promise.all(
-      posts.map(async (post) => ({ ...post, stats: await getPostVoteStats(post.id) }))
-    );
+    const ids = posts.map((p) => p.id as string);
+    const counts = await getVoteCountsBulk(ids);
+    const postsWithStats = posts.map((post) => {
+      const id = post.id as string;
+      const c = counts[id] ?? { relevant: 0, irrelevant: 0 };
+      return {
+        ...post,
+        stats: { relevant: c.relevant, irrelevant: c.irrelevant }
+      };
+    });
     return NextResponse.json({ posts: postsWithStats });
   } catch (error) {
     return routeError(error);
@@ -25,10 +32,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = requireAdmin(request);
     const body = (await request.json()) as Partial<PostInput>;
-    const adminId =
-      user.id === "admin"
-        ? (await supabaseAdmin.from("users").select("id").eq("username", "admin").single()).data?.id
-        : user.id;
+    const adminId = await resolveAdminPostAuthorId(user.id);
     const post = await createPost(
       {
         title: body.title ?? "",

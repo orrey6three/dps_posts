@@ -1,3 +1,6 @@
+/** Минимум точечных меток для включения кластеризации (React и legacy). */
+export const CLUSTER_MIN_MARKERS = 28;
+
 /** Юго-запад и северо-восток области карты (как в legacy app.js) — меньше лишних тайлов за пределами регионов. */
 export const MAP_AREA_LIMITS: [[number, number], [number, number]] = [
   [54.8, 62.6],

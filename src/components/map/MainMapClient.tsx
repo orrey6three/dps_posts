@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AddPostBox } from "@/components/map/AddPostBox";
 import { AuthBox } from "@/components/map/AuthBox";
 import { PostDetailsBox } from "@/components/map/PostDetailsBox";
@@ -24,6 +24,11 @@ export function MainMapClient({ yandexApiKey }: Props) {
   const [newComment, setNewComment] = useState("");
   const [newTags, setNewTags] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
+  const selectedPostRef = useRef<PostRow | null>(null);
+
+  useEffect(() => {
+    selectedPostRef.current = selectedPost;
+  }, [selectedPost]);
 
   useEffect(() => {
     setCity(readStorage("dps45_city", "shumikha"));
@@ -32,8 +37,23 @@ export function MainMapClient({ yandexApiKey }: Props) {
     getOrCreateDeviceId();
     void loadMe();
     void loadPosts();
-    const id = setInterval(() => void loadPosts(), 15000);
-    return () => clearInterval(id);
+
+    const poll = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      void loadPosts();
+    };
+    const id = setInterval(poll, 15000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void loadPosts();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("online", onVis);
+
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("online", onVis);
+    };
   }, []);
 
   useEffect(() => writeStorage("dps45_city", city), [city]);
@@ -46,12 +66,13 @@ export function MainMapClient({ yandexApiKey }: Props) {
   }
 
   async function loadPosts() {
-    const res = await fetch("/api/posts");
+    const res = await fetch("/api/posts", { cache: "no-store" });
     if (!res.ok) return;
     const data = await res.json();
     setPosts(data.posts ?? []);
-    if (selectedPost) {
-      const updated = (data.posts ?? []).find((p: PostRow) => p.post_id === selectedPost.post_id);
+    const sel = selectedPostRef.current;
+    if (sel) {
+      const updated = (data.posts ?? []).find((p: PostRow) => p.post_id === sel.post_id);
       if (updated) setSelectedPost(updated);
     }
   }

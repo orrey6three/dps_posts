@@ -116,6 +116,7 @@ class AdminPanel {
         document.getElementById('login-form')?.addEventListener('submit', (e) => this.handleLogin(e));
         document.getElementById('logout-btn')?.addEventListener('click', () => this.handleLogout());
         document.getElementById('add-post-btn')?.addEventListener('click', () => this.showPostModal());
+        document.getElementById('clear-all-votes-btn')?.addEventListener('click', () => this.clearAllVotes());
         document.getElementById('close-modal')?.addEventListener('click', () => this.hidePostModal());
         document.getElementById('cancel-modal')?.addEventListener('click', () => this.hidePostModal());
         document.getElementById('post-form')?.addEventListener('submit', (e) => this.handlePostSubmit(e));
@@ -138,6 +139,7 @@ class AdminPanel {
             const id = btn.getAttribute('data-id');
             if (action === 'edit') this.editPost(id);
             if (action === 'delete') this.showConfirmDelete('post', id, btn.getAttribute('data-title'));
+            if (action === 'clear-votes') this.clearVotesForPost(id);
         });
 
         // Event delegation for reports
@@ -276,6 +278,7 @@ class AdminPanel {
                         <p class="post-address">${this.escapeHtml(p.address || 'Без адреса')}</p>
                     </div>
                     <div class="post-card-actions">
+                        <button type="button" class="btn-icon clear-votes" data-action="clear-votes" data-id="${p.id}" title="Очистить голоса по метке"><i class="fa-solid fa-broom"></i></button>
                         <button class="btn-icon edit" data-action="edit" data-id="${p.id}"><i class="fa-solid fa-pen"></i></button>
                         <button class="btn-icon delete" data-action="delete" data-id="${p.id}" data-title="${p.title}"><i class="fa-solid fa-trash"></i></button>
                     </div>
@@ -287,6 +290,40 @@ class AdminPanel {
                 </div>` : ''}
             </div>
         `).join('');
+    }
+
+    async clearVotesForPost(id) {
+        if (!confirm('Удалить все голоса по этой метке?')) return;
+        try {
+            const res = await fetch(`/admin/api/posts/${id}/votes`, { method: 'DELETE', credentials: 'include' });
+            if (res.ok) {
+                this.showToast('success', 'Голоса по метке удалены');
+                await this.loadPosts();
+                await this.loadStats();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                this.showToast('error', err.error || err.details || 'Ошибка');
+            }
+        } catch (e) {
+            this.showToast('error', 'Ошибка сети');
+        }
+    }
+
+    async clearAllVotes() {
+        if (!confirm('Удалить ВСЕ голоса по всем меткам? Действие необратимо.')) return;
+        try {
+            const res = await fetch('/admin/api/votes', { method: 'DELETE', credentials: 'include' });
+            if (res.ok) {
+                this.showToast('success', 'Все голоса удалены');
+                await this.loadPosts();
+                await this.loadStats();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                this.showToast('error', err.error || err.details || 'Ошибка');
+            }
+        } catch (e) {
+            this.showToast('error', 'Ошибка сети');
+        }
     }
 
     async loadUsers() {

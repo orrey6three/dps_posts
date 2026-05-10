@@ -32,8 +32,10 @@ body {
 }
 .app-shell {
   position: relative;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  min-width: 100vw;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 .map-host {
   width: 100%;
@@ -277,7 +279,19 @@ body {
   100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
 }
 
-.marker-icon {
-  width: 55%;
-  height: 55%;
+.button:focus-visible,
+.chip:focus-visible,
+.input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marker-pulse {
+    animation: none !important;
+  }
+
+  .custom-marker {
+    transition: none !important;
+  }
 }

@@ -79,6 +79,21 @@ export function AdminPanel() {
     await Promise.all([loadPosts(), loadStats()]);
   }
 
+  async function clearVotesForPost(id: string) {
+    const res = await fetch(`/admin/api/posts/${id}/votes`, { method: "DELETE", credentials: "include" });
+    if (!res.ok) return setNotice("Не удалось очистить голоса");
+    setNotice("Голоса по метке удалены");
+    await Promise.all([loadPosts(), loadStats()]);
+  }
+
+  async function clearAllVotes() {
+    if (!confirm("Удалить ВСЕ голоса по всем меткам? Это необратимо.")) return;
+    const res = await fetch("/admin/api/votes", { method: "DELETE", credentials: "include" });
+    if (!res.ok) return setNotice("Не удалось очистить голоса");
+    setNotice("Все голоса удалены");
+    await Promise.all([loadPosts(), loadStats()]);
+  }
+
   async function removeUser(id: string) {
     await fetch(`/admin/api/users/${id}`, { method: "DELETE", credentials: "include" });
     await Promise.all([loadUsers(), loadStats()]);
@@ -105,8 +120,13 @@ export function AdminPanel() {
           Пользователи
         </button>
       </div>
+      <div className="row wrap">
+        <button type="button" className="button button-soft" onClick={() => void clearAllVotes()}>
+          Очистить все голоса
+        </button>
+      </div>
       {tab === "posts" ? (
-        <AdminPosts posts={posts} onSave={savePost} onDelete={removePost} />
+        <AdminPosts posts={posts} onSave={savePost} onDelete={removePost} onClearVotes={clearVotesForPost} />
       ) : (
         <AdminUsers users={users} onDelete={removeUser} />
       )}

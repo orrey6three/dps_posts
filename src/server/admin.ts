@@ -1,6 +1,18 @@
 import { supabaseAdmin } from "@/server/db";
 import { HttpError } from "@/server/errors";
 
+let cachedAdminRowId: string | null | undefined;
+
+/** JWT может содержать id строкой «admin»; один раз резолвим в UUID строки users. */
+export async function resolveAdminPostAuthorId(jwtUserId: string): Promise<string | null> {
+  if (jwtUserId !== "admin") return jwtUserId;
+  if (cachedAdminRowId !== undefined) return cachedAdminRowId;
+  const { data } = await supabaseAdmin.from("users").select("id").eq("username", "admin").single();
+  const resolved = data?.id ?? null;
+  cachedAdminRowId = resolved;
+  return resolved;
+}
+
 export async function getDashboardStats() {
   const [postsRes, usersRes, votesRes] = await Promise.all([
     supabaseAdmin.from("posts").select("id", { count: "exact", head: true }),
@@ -21,15 +33,24 @@ export async function getUsers() {
     .order("created_at", { ascending: false });
   if (error) throw new HttpError(500, "Не удалось загрузить пользователей");
   const users = data ?? [];
-  return Promise.all(
-    users.map(async (user) => {
-      const { count } = await supabaseAdmin
-        .from("posts")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id);
-      return { ...user, post_count: count ?? 0 };
-    })
-  );
+  if (users.length === 0) return [];
+
+  const { data: postRows, error: postsErr } = await supabaseAdmin
+    .from("posts")
+    .select("user_id")
+    .not("user_id", "is", null);
+  if (postsErr) throw new HttpError(500, "Не удалось посчитать метки пользователей");
+
+  const countByUser = new Map<string, number>();
+  for (const row of postRows ?? []) {
+    const uid = row.user_id as string;
+    countByUser.set(uid, (countByUser.get(uid) ?? 0) + 1);
+  }
+
+  return users.map((user) => ({
+    ...user,
+    post_count: countByUser.get(user.id) ?? 0
+  }));
 }
 
 export async function shadowbanUser(userId: string, isShadowbanned: boolean) {

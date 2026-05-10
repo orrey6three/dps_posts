@@ -18,19 +18,20 @@ export async function cleanupOldPosts() {
   const oneHourAgo = new Date(now - 60 * 60 * 1000).toISOString();
   const fiveMinutesAgo = new Date(now - 5 * 60 * 1000).toISOString();
 
-  await supabaseAdmin
-    .from("posts")
-    .delete()
-    .eq("type", "Патруль")
-    .eq("is_static", false)
-    .lt("created_at", fiveMinutesAgo);
-
-  await supabaseAdmin
-    .from("posts")
-    .delete()
-    .neq("type", "Патруль")
-    .eq("is_static", false)
-    .lt("created_at", oneHourAgo);
+  await Promise.all([
+    supabaseAdmin
+      .from("posts")
+      .delete()
+      .eq("type", "Патруль")
+      .eq("is_static", false)
+      .lt("created_at", fiveMinutesAgo),
+    supabaseAdmin
+      .from("posts")
+      .delete()
+      .neq("type", "Патруль")
+      .eq("is_static", false)
+      .lt("created_at", oneHourAgo)
+  ]);
 }
 
 export async function getPostsWithStats(currentUserId?: string | null) {
@@ -60,14 +61,7 @@ export async function createPost(input: PostInput, userId?: string | null) {
   };
   if (input.comment) payload.comment = input.comment;
   if (input.tags?.length) payload.tags = input.tags;
-  if (userId) {
-    const { data: author } = await supabaseAdmin
-      .from("users")
-      .select("id")
-      .eq("id", userId)
-      .single();
-    if (author?.id) payload.user_id = userId;
-  }
+  if (userId) payload.user_id = userId;
   if (input.street_geometry?.length) payload.street_geometry = input.street_geometry;
   if (input.created_at) payload.created_at = input.created_at;
 
@@ -94,7 +88,12 @@ export async function deletePost(postId: string) {
 }
 
 export async function getAllPosts() {
-  const { data, error } = await supabaseAdmin.from("posts").select("*").order("title");
+  const { data, error } = await supabaseAdmin
+    .from("posts")
+    .select(
+      "id, title, address, latitude, longitude, type, comment, tags, user_id, created_at, is_static, street_geometry"
+    )
+    .order("title");
   if (error) throw new HttpError(500, "Не удалось загрузить посты");
   return data ?? [];
 }

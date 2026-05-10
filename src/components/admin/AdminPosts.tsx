@@ -27,11 +27,12 @@ type Props = {
   posts: Post[];
   onSave: (draft: Draft) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onClearVotes: (id: string) => Promise<void>;
 };
 
 const EMPTY_DRAFT: Draft = { type: "ДПС", address: "", latitude: "55.2255", longitude: "63.2982", comment: "" };
 
-export function AdminPosts({ posts, onSave, onDelete }: Props) {
+export function AdminPosts({ posts, onSave, onDelete, onClearVotes }: Props) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
 
   function edit(post: Post) {
@@ -83,6 +84,15 @@ export function AdminPosts({ posts, onSave, onDelete }: Props) {
               ✅ {post.stats?.relevant ?? 0} · ❌ {post.stats?.irrelevant ?? 0}
             </span>
             <div className="row">
+              <button
+                type="button"
+                className="button button-warning"
+                onClick={() => {
+                  if (confirm("Удалить все голоса по этой метке?")) void onClearVotes(post.id);
+                }}
+              >
+                Голоса
+              </button>
               <button className="button button-soft" onClick={() => edit(post)}>
                 Изменить
               </button>
