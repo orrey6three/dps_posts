@@ -20,9 +20,13 @@
     <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <link
       rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
     />
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
 
     <link rel="stylesheet" href="/css/style.css" />
   </head>
@@ -331,15 +335,13 @@
             <div id="notify-status" class="theme-status-tag">Выкл</div>
           </div>
 
-          <div id="notify-config" style="display: none; padding: 0 15px 15px">
+          <div id="notify-config" class="notify-config-panel" style="display: none">
             <label
-              class="form-label text-muted"
-              style="font-size: 0.75rem; margin-top: 10px; display: block"
+              class="form-label text-muted notify-config-label"
               >Радиус оповещения (км):</label
             >
             <div
               class="radius-selector mb-3"
-              style="display: flex; gap: 5px; margin-top: 5px"
             >
               <button class="radius-btn active" data-radius="1">1</button>
               <button class="radius-btn" data-radius="5">5</button>
@@ -349,43 +351,32 @@
 
             <div
               class="quiet-hours-grid"
-              style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px"
             >
               <div class="time-input-group">
-                <label class="form-label text-muted" style="font-size: 0.7rem"
+                <label class="form-label text-muted"
                   >Тихий режим с:</label
                 >
-                <input
-                  type="time"
-                  id="quiet-start"
-                  value="23:00"
-                  style="
-                    width: 100%;
-                    background: rgba(255, 255, 255, 0.05);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    color: #fff;
-                    border-radius: 8px;
-                    padding: 5px;
-                  "
-                />
+                <div class="time-field-wrapper">
+                  <i class="fa-solid fa-moon"></i>
+                  <input
+                    type="time"
+                    id="quiet-start"
+                    value="23:00"
+                  />
+                </div>
               </div>
               <div class="time-input-group">
-                <label class="form-label text-muted" style="font-size: 0.7rem"
+                <label class="form-label text-muted"
                   >До:</label
                 >
-                <input
-                  type="time"
-                  id="quiet-end"
-                  value="07:00"
-                  style="
-                    width: 100%;
-                    background: rgba(255, 255, 255, 0.05);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    color: #fff;
-                    border-radius: 8px;
-                    padding: 5px;
-                  "
-                />
+                <div class="time-field-wrapper">
+                  <i class="fa-solid fa-sun"></i>
+                  <input
+                    type="time"
+                    id="quiet-end"
+                    value="07:00"
+                  />
+                </div>
               </div>
             </div>
           </div>

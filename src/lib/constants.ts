@@ -1,3 +1,9 @@
+/** Юго-запад и северо-восток области карты (как в legacy app.js) — меньше лишних тайлов за пределами регионов. */
+export const MAP_AREA_LIMITS: [[number, number], [number, number]] = [
+  [54.8, 62.6],
+  [55.5, 64.1]
+];
+
 export const CITY_COORDS: Record<string, [number, number]> = {
   shchuchye: [55.2133, 62.7634],
   shumikha: [55.2255, 63.2982],

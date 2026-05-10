@@ -729,9 +729,17 @@ class DPSMap {
             if (lastVoterName) lastVoterName.textContent = formatDisplayUsername(post.last_voter_username);
             if (lastVoteAtTime) lastVoteAtTime.textContent = formatYekaterinburgTime(post.last_activity);
             if (lastVoteType) {
-                const isRelevant = post.last_vote_type === 'relevant';
-                lastVoteType.textContent = ' ' + (isRelevant ? 'Актуально' : 'Не актуально');
-                lastVoteType.style.color = isRelevant ? 'var(--success)' : 'var(--danger)';
+                // Determine if vote is older than 24 hours
+                const isVoteStale = isStale(new Date(post.last_activity).getTime(), 24 * 60 * 60 * 1000);
+                
+                if (isVoteStale) {
+                    lastVoteType.textContent = ' (Давно)';
+                    lastVoteType.style.color = 'var(--text-muted)';
+                } else {
+                    const isRelevant = post.last_vote_type === 'relevant';
+                    lastVoteType.textContent = ' ' + (isRelevant ? 'Актуально' : 'Не актуально');
+                    lastVoteType.style.color = isRelevant ? 'var(--success)' : 'var(--danger)';
+                }
             }
             if (lastVoteRow) lastVoteRow.style.display = 'flex';
         } else {
@@ -758,7 +766,7 @@ class DPSMap {
                 center: defaultCenter || this.CITY_COORDS.shumikha,
                 zoom: 12,
                 type: initialMapType,
-                controls: ['zoomControl', 'geolocationControl']
+                controls: ['geolocationControl']
             }, {
                 searchControlProvider: 'yandex#search',
                 suppressMapOpenBlock: true,
@@ -900,55 +908,97 @@ class DPSMap {
             // Если пост был недавно (меньше часа назад) отмечен как "Чисто" (irrelevant)
             const explicitlyCleared = (timeIrrelevant > timeRelevant) && !isStale(timeIrrelevant, 60 * 60 * 1000);
             
-            let emojiStr = this.getEmojiByType(post.type);
-            if (isPoPuti) emojiStr = '❤️';
-            else if (explicitlyCleared) emojiStr = '✅'; // Показываем галочку, если недавно передали "Чисто"
-            
             const tagStr = post.tags && post.tags.length > 0 ? `<br><em>${post.tags.map(t => '#'+t).join(' ')}</em>` : '';
             
             let filterStyle = 'none';
-            if (!isPoPuti) {
-                if (explicitlyCleared) {
-                    filterStyle = 'grayscale(1) opacity(0.4) contrast(0.6)'; // Тусклая для неактуальных
-                } else if (isFresh) {
-                    filterStyle = 'drop-shadow(0 0 12px rgba(34, 197, 94, 0.9)) drop-shadow(0 2px 4px rgba(0,0,0,0.5))'; // Яркий зеленый неон
+            const isStalePost = !isFresh || explicitlyCleared;
+            
+            let effectiveType = post.type;
+            if (explicitlyCleared && post.type !== 'Чисто') {
+                effectiveType = 'Чисто';
+            }
+
+            if (isStalePost && !isPoPuti) {
+                if (effectiveType === 'Чисто') {
+                    filterStyle = 'none'; 
                 } else {
-                    filterStyle = 'grayscale(1) opacity(0.7) contrast(0.8)'; // Четкая серая для старых
+                    filterStyle = 'grayscale(1) opacity(0.6) contrast(0.8)'; 
                 }
             }
             
-            const markerClass = isPoPuti ? 'marker-heart' : '';
-            const sizeValue = this.markerSize;
+            let themeClass = 'marker-default';
+            let svg = '';
+
+            if (isPoPuti) {
+                themeClass = 'marker-heart';
+                svg = '<span class="marker-heart-icon" style="display: flex;">❤️</span>';
+            } else if (effectiveType === 'Патруль' || (!['Нужна помощь', 'Чисто', 'Вопрос', 'Патруль'].includes(effectiveType))) {
+                themeClass = 'marker-patrol';
+                svg = `<svg class="marker-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="32" cy="18" r="6" fill="#f43f5e" opacity="0.8"/>
+                          <circle cx="32" cy="18" r="9" fill="#f43f5e" opacity="0.3"/>
+                          <path d="M12 40L16 28H48L52 40H12Z" fill="#1e293b"/>
+                          <path d="M8 40H56V48C56 50.2091 54.2091 52 52 52H12C9.79086 52 8 50.2091 8 48V40Z" fill="#0f172a"/>
+                          <path d="M19 29H45L48 38H16L19 29Z" fill="#38bdf8" opacity="0.9"/>
+                          <circle cx="16" cy="46" r="3.5" fill="#fbbf24"/>
+                          <circle cx="48" cy="46" r="3.5" fill="#fbbf24"/>
+                          <rect x="25" y="44" width="14" height="4" rx="1" fill="#334155"/>
+                          <rect x="24" y="24" width="16" height="4" rx="1" fill="#f43f5e"/>
+                          <rect x="32" y="24" width="8" height="4" fill="#3b82f6"/>
+                       </svg>`;
+            } else if (effectiveType === 'Нужна помощь') {
+                themeClass = 'marker-help';
+                svg = `<svg class="marker-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M32 6C32 6 52 14 52 30C52 48 32 58 32 58C32 58 12 48 12 30C12 14 32 6 32 6Z" fill="#f43f5e" stroke="#fff" stroke-width="3"/>
+                          <path d="M32 18V36M32 46V48" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+                       </svg>`;
+            } else if (effectiveType === 'Чисто') {
+                themeClass = 'marker-clear';
+                svg = `<svg class="marker-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="32" cy="32" r="24" fill="#22c55e"/>
+                          <path d="M22 34L28 40L44 24" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                       </svg>`;
+            } else if (effectiveType === 'Вопрос') {
+                themeClass = 'marker-question';
+                svg = `<svg class="marker-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="32" cy="32" r="24" fill="#f59e0b"/>
+                          <path d="M25 24C25 20 39 18 39 26C39 31 32 32 32 37M32 46V48" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+                       </svg>`;
+            }
+
+            const sizeValue = Math.max(this.markerSize, 36);
             const halfSize = sizeValue / 2;
-            
-            // Custom SVG marker for DPS (aspect ratio 140:275, pin at near bottom @ 262/275)
-            const isDpsMarker = !['Нужна помощь', 'Чисто', 'Вопрос', 'Патруль'].includes(post.type);
-            const layoutStyle = isDpsMarker 
-                ? `width: ${sizeValue}px; height: ${sizeValue * 1.96}px; transform: translate(-50%, -95%);` 
-                : `font-size: ${sizeValue}px; line-height: ${sizeValue}px; transform: translate(-50%, -50%);`;
+
+            const htmlInner = isPoPuti 
+                ? `<div style="font-size: ${sizeValue * 0.8}px; line-height: ${sizeValue * 0.8}px; width: ${sizeValue}px; height: ${sizeValue}px; display: flex; align-items: center; justify-content: center;">${svg}</div>`
+                : `<div class="custom-marker ${themeClass}" style="width: ${sizeValue}px; height: ${sizeValue}px;">
+                    ${!isStalePost ? '<div class="marker-pulse"></div>' : ''}
+                    ${svg}
+                   </div>`;
 
             const CustomIconLayout = ymaps.templateLayoutFactory.createClass(
-                `<div class="${markerClass}" style="${layoutStyle} cursor: pointer; filter: ${filterStyle}; transition: all 0.3s ease;">
-                    ${isDpsMarker ? `<img src="/img/marker_dps.svg" style="width:100%; height:100%; object-fit:contain;">` : emojiStr}
+                `<div style="filter: ${filterStyle}; transition: all 0.3s ease;">
+                    ${htmlInner}
                 </div>`
             );
 
+            // The iconLayout renders a div of sizeValue x sizeValue.
+            const yOffset = isPoPuti ? -halfSize : -sizeValue;
+            
             const placemark = new ymaps.Placemark(
                 [post.latitude, post.longitude],
                 {
-                    hintContent: post.type || 'ДПС',
-                    balloonContent: `<strong>${post.type || 'ДПС'}</strong><br>${post.comment || ''}${tagStr}`,
+                    // No hint or balloon needed, we use our own bottom sheet
                 },
                 {
                     iconLayout: CustomIconLayout,
                     iconShape: {
                         type: 'Rectangle',
-                        coordinates: isDpsMarker ? [
-                            [-halfSize, -sizeValue * 1.9], [halfSize, 0]
-                        ] : [
-                            [-halfSize, -halfSize], [halfSize, halfSize]
+                        coordinates: [
+                            [0, 0], [sizeValue, sizeValue]
                         ]
                     },
+                    iconOffset: [-halfSize, yOffset],
                     hideIconOnBalloonOpen: false
                 }
             );
@@ -956,7 +1006,7 @@ class DPSMap {
             placemark.events.add('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (isPoPuti) {
+                if (isPoPuti && typeof confetti !== 'undefined') {
                     confetti({
                         particleCount: 150,
                         spread: 70,
@@ -1015,9 +1065,9 @@ class DPSMap {
         this.map.geoObjects.add(patrolLine);
         this.map.geoObjects.add(patrolLineBlue);
         
-        // Use a composite key to avoid conflicts
+        // Use a composite key to avoid conflicts — store BOTH lines to prevent memory leak
         const markerKey = 'patrol_' + post.post_id;
-        this.markers[markerKey] = patrolLine;
+        this.markers[markerKey] = [patrolLine, patrolLineBlue];
 
         // Animation logic for "moving" lights - faster and smoother
         let offset = 0;
@@ -1344,9 +1394,12 @@ class DPSMap {
         
         modal.classList.add('active');
         
+        // Clone buttons to remove any previously attached listeners
         modal.querySelectorAll('.city-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const city = btn.getAttribute('data-city');
+            const fresh = btn.cloneNode(true);
+            btn.parentNode.replaceChild(fresh, btn);
+            fresh.addEventListener('click', () => {
+                const city = fresh.getAttribute('data-city');
                 this.switchCity(city);
                 modal.classList.remove('active');
             });

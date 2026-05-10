@@ -35,13 +35,25 @@ export async function createPatrolFromBot(input: BotInput, token?: string | null
     : "Патруль";
 
   const author = await resolveAuthor(input.author);
-  const staticPost = await findStaticPost(input.street);
-  if (staticPost) {
+  const staticPosts = await findStaticPosts(input.street);
+  
+  if (staticPosts.length > 0) {
     const voteType = type === "Чисто" ? "irrelevant" : "relevant";
     const deviceId = author.userId ?? "bot";
-    await supabaseAdmin.from("votes").insert([{ post_id: staticPost.id, device_id: deviceId, vote_type: voteType }]);
-    if (author.userId) await supabaseAdmin.from("posts").update({ user_id: author.userId }).eq("id", staticPost.id);
-    return { mode: "static", post: staticPost };
+    
+    for (const post of staticPosts) {
+      await supabaseAdmin.from("votes").insert([{ 
+        post_id: post.id, 
+        device_id: deviceId, 
+        vote_type: voteType 
+      }]);
+      if (author.userId) {
+        await supabaseAdmin.from("posts").update({ user_id: author.userId }).eq("id", post.id);
+      }
+    }
+    
+    // If it was just a Clear report on static posts, we're done
+    if (type === "Чисто") return { mode: "static", posts: staticPosts };
   }
 
   const existingDynamic = await findRecentDynamicPost(input.street, city);
@@ -91,14 +103,13 @@ async function resolveAuthor(author?: string) {
   return { userId: (data?.id as string) ?? null };
 }
 
-async function findStaticPost(street: string) {
+async function findStaticPosts(street: string) {
   const { data } = await supabaseAdmin
     .from("posts")
     .select("id")
     .eq("is_static", true)
-    .ilike("address", `%${street}%`)
-    .single();
-  return data as { id: string } | null;
+    .ilike("address", `%${street}%`);
+  return (data || []) as { id: string }[];
 }
 
 async function findRecentDynamicPost(street: string, city: string) {

@@ -1,16 +1,12 @@
-const STATIC_CACHE = 'dps45-static-v44';
-const RUNTIME_CACHE = 'dps45-runtime-v44';
+const STATIC_CACHE = 'dps45-static-v45';
+const RUNTIME_CACHE = 'dps45-runtime-v45';
 
-// Keep this list small to avoid delaying first load.
+// Only precache files that actually exist in the public directory.
 const PRECACHE_URLS = [
   '/',
-  '/index.html',
   '/css/style.css',
   '/js/app.js',
-  '/admin',
-  '/admin.html',
-  '/css/admin.css',
-  '/js/admin.js'
+  '/favicon.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -46,7 +42,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   // Never cache API/admin actions.
-  if (url.pathname.startsWith('/api') || url.pathname.startsWith('/admin/')) return;
+  if (url.pathname.startsWith('/api') || url.pathname.startsWith('/admin')) return;
 
   // Navigation: network-first (fresh HTML), fallback to cache.
   if (req.mode === 'navigate') {
@@ -57,7 +53,7 @@ self.addEventListener('fetch', (event) => {
         if (res && res.ok) cache.put(req, res.clone());
         return res;
       } catch {
-        return (await cache.match(req)) || (await caches.match('/index.html'));
+        return (await cache.match(req)) || (await caches.match('/'));
       }
     })());
     return;
@@ -74,4 +70,3 @@ self.addEventListener('fetch', (event) => {
     return res;
   })());
 });
-
