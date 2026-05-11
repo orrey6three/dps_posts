@@ -14,12 +14,33 @@ type BotInput = {
   street?: string;
   city?: string;
   comment?: string;
-  coords?: [number, number];
+  /** Одна точка `[lat, lon]` или массив точек `[[lat, lon], ...]` от бота */
+  coords?: [number, number] | [number, number][];
   street_geometry?: number[][];
   type?: MarkerType;
   author?: string;
   date?: number;
 };
+
+function resolveCityKey(raw: string): keyof typeof CITY_COORDS {
+  const s = raw.toLowerCase().trim();
+  if (s.includes("щуч") || s === "shchuchye") return "shchuchye";
+  if (s.includes("мишкин") || s === "mishkino") return "mishkino";
+  if (s.includes("шумих") || s === "shumikha") return "shumikha";
+  return "shumikha";
+}
+
+/** Приводит coords бота к одной паре `[lat, lon]` */
+function normalizeBotCoordsPair(coords: BotInput["coords"]): [number, number] | undefined {
+  if (!coords || !Array.isArray(coords) || coords.length === 0) return undefined;
+  const a = coords[0];
+  const b = coords[1];
+  if (typeof a === "number" && typeof b === "number") return [a, b];
+  if (Array.isArray(a) && a.length >= 2 && typeof a[0] === "number" && typeof a[1] === "number") {
+    return [a[0], a[1]];
+  }
+  return undefined;
+}
 
 export async function createPatrolFromBot(input: BotInput, token?: string | null) {
   if (!env.botToken) throw new HttpError(500, "BOT_TOKEN не настроен на сервере");
@@ -28,8 +49,10 @@ export async function createPatrolFromBot(input: BotInput, token?: string | null
     throw new HttpError(400, "Поле street обязательно");
   }
 
-  const city = input.city ?? "shumikha";
-  const anchor = input.coords?.length === 2 ? input.coords : CITY_COORDS[city] ?? CITY_COORDS.shumikha;
+  const city = input.city ?? "Шумиха";
+  const cityKey = resolveCityKey(city);
+  const coordPair = normalizeBotCoordsPair(input.coords);
+  const anchor = coordPair ?? CITY_COORDS[cityKey] ?? CITY_COORDS.shumikha;
   const type = ["ДПС", "Чисто", "Патруль", "Нужна помощь"].includes(input.type ?? "")
     ? (input.type as MarkerType)
     : "Патруль";
@@ -158,9 +181,17 @@ out geom 1;`;
   }
 }
 
-function pickCenterPoint(geometry: number[][]) {
-  if (!geometry.length) return [55.2255, 63.2982] as [number, number];
-  const mid = Math.floor(geometry.length / 2);
-  const [lat, lon] = geometry[mid] ?? geometry[0];
-  return [Number(lat), Number(lon)] as [number, number];
+/** Полилиния `[[lat,lon],...]` или одна пара `[lat, lon]` (когда нет OSM-геометрии и подставили anchor) */
+function pickCenterPoint(geometry: number[][] | [number, number]): [number, number] {
+  if (!geometry || geometry.length === 0) return [55.2255, 63.2982];
+  const first = geometry[0];
+  if (typeof first === "number" && typeof geometry[1] === "number") {
+    const pair = geometry as [number, number];
+    return [Number(pair[0]), Number(pair[1])];
+  }
+  const line = geometry as number[][];
+  if (!line.length) return [55.2255, 63.2982];
+  const mid = Math.floor(line.length / 2);
+  const pt = line[mid] ?? line[0];
+  return [Number(pt[0]), Number(pt[1])];
 }
