@@ -109,6 +109,18 @@ a {
     touch-action: none;
 }
 
+/* VK Mini App WebView: после VKWebAppInit высота задаётся родителем — заполняем фрейм */
+html.dps-vk-miniapp,
+html.dps-vk-miniapp body {
+    height: 100%;
+    min-height: 100%;
+}
+
+html.dps-vk-miniapp #map {
+    height: 100%;
+    min-height: 100%;
+}
+
 [data-theme="light"] #map {
     filter: saturate(1.1) contrast(1.02) brightness(1.02);
 }

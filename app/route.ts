@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
+import { VK_MINIAPP_FRAME_ANCESTORS_CSP } from "@/server/vkMiniApp";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,8 @@ export async function GET() {
   return new Response(body, {
     headers: {
       "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store"
+      "cache-control": "no-store",
+      "content-security-policy": VK_MINIAPP_FRAME_ANCESTORS_CSP
     }
   });
 }

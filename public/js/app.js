@@ -745,6 +745,11 @@ class DPSMap {
     }
 
     initMap() {
+        if (typeof ymaps === 'undefined') {
+            this.hideLoading();
+            this.showNotification('Карта не загрузилась (проверьте сеть или ключ API Яндекса).', 'error');
+            return;
+        }
         ymaps.ready(() => {
             const MAP_LIMITS = [
                 [54.80, 62.60],
@@ -1640,3 +1645,26 @@ class DPSMap {
 }
 
 new DPSMap();
+
+(function initVkMiniAppResize() {
+    if (!window.__DPS_VK_MINIAPP__ || !window.vkBridge || !window.vkBridge.send) return;
+
+    function resizeToContent() {
+        var h = Math.max(
+            document.documentElement.scrollHeight || 0,
+            document.body ? document.body.scrollHeight : 0,
+            window.innerHeight || 0,
+            720
+        );
+        window.vkBridge.send('VKWebAppResizeWindow', { height: h }).catch(function () {});
+    }
+
+    window.addEventListener('load', function () {
+        resizeToContent();
+        setTimeout(resizeToContent, 400);
+        setTimeout(resizeToContent, 1500);
+    });
+    window.addEventListener('orientationchange', function () {
+        setTimeout(resizeToContent, 350);
+    });
+})();
