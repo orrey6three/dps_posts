@@ -19,6 +19,17 @@
       type="text/javascript"
     ></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script type="application/json" id="dps-runtime">%DPS_RUNTIME_JSON%</script>
+    <script>
+      (function () {
+        try {
+          var el = document.getElementById("dps-runtime");
+          window.__DPS_CONFIG__ = el ? JSON.parse(el.textContent) : {};
+        } catch (e) {
+          window.__DPS_CONFIG__ = {};
+        }
+      })();
+    </script>
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"

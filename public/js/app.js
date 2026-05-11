@@ -665,9 +665,23 @@ class DPSMap {
     }
 
     initRealtime() {
-        const supabaseClient = window.supabase.createClient(
-    'https://plfzklrsmasyfibwgwjy.supabase.co',
-    'sb_publishable_R2AXul-1rak2qPlfoLLc0Q_O20f_f7y');
+        const cfg = window.__DPS_CONFIG__ || {};
+        if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
+            console.warn('[DPS] Supabase Realtime отключён: задайте SUPABASE_URL и SUPABASE_ANON_KEY (или NEXT_PUBLIC_*) в Vercel.');
+            return;
+        }
+        if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+            console.warn('[DPS] Supabase UMD не загрузился.');
+            return;
+        }
+
+        let supabaseClient;
+        try {
+            supabaseClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+        } catch (e) {
+            console.error('[DPS] createClient Supabase:', e);
+            return;
+        }
 
         this.realtimeChannel = supabaseClient
             .channel('db-changes')
@@ -678,7 +692,6 @@ class DPSMap {
                     await this.loadPosts();
                 }
             )
-            // Listen for DELETED POSTS
             .on(
                 'postgres_changes',
                 { event: 'DELETE', schema: 'public', table: 'posts' },
@@ -686,23 +699,26 @@ class DPSMap {
                     await this.loadPosts();
                 }
             )
-            // Listen for NEW VOTES
             .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'votes' },
                 async (payload) => {
                     await this.loadPosts();
-
-                    if (this.currentPost && this.currentPost.post_id === payload.new.post_id) {
-                        const updatedPost = this.posts.find(p => p.post_id === payload.new.post_id);
-                        if (updatedPost) {
-                            this.currentPost = updatedPost;
-                            this.updateBottomSheetTimes(updatedPost);
-                        }
+                    const row = payload && payload.new;
+                    if (!row || !this.currentPost) return;
+                    if (this.currentPost.post_id !== row.post_id) return;
+                    const updatedPost = this.posts.find(p => p.post_id === row.post_id);
+                    if (updatedPost) {
+                        this.currentPost = updatedPost;
+                        this.updateBottomSheetTimes(updatedPost);
                     }
                 }
             )
-            .subscribe(() => {});
+            .subscribe((status) => {
+                if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    console.warn('[DPS] Supabase Realtime:', status);
+                }
+            });
     }
 
     updateBottomSheetTimes(post) {
