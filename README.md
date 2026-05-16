@@ -60,6 +60,8 @@ BOT_TOKEN=
 NEXT_PUBLIC_YANDEX_MAPS_API_KEY=
 ```
 
+Supabase URL и anon key задаются один раз (`SUPABASE_*`); для Realtime на клиенте они передаются из серверных страниц (`app/page.tsx`, `admin/page.tsx`), без `NEXT_PUBLIC_SUPABASE_*`.
+
 ## Локальный запуск
 ```bash
 npm install

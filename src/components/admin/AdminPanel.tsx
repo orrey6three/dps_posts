@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LogOut, Map, MapPin, Settings as SettingsIcon, ThumbsUp, Trash2, Users } from "lucide-react";
 import { AdminLogin } from "@/components/admin/AdminLogin";
 import { AdminPosts } from "@/components/admin/AdminPosts";
@@ -9,9 +9,15 @@ import { AdminSettings } from "@/components/admin/AdminSettings";
 import { Brand } from "@/components/ui/Brand";
 import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
-import { supabase } from "@/lib/supabase";
+import { createRealtimeSupabase } from "@/lib/supabase";
 
-export function AdminPanel() {
+type Props = { supabaseUrl: string; supabaseAnonKey: string };
+
+export function AdminPanel({ supabaseUrl, supabaseAnonKey }: Props) {
+  const sb = useMemo(
+    () => createRealtimeSupabase(supabaseUrl, supabaseAnonKey),
+    [supabaseUrl, supabaseAnonKey]
+  );
   const [authorized, setAuthorized] = useState(false);
   const [tab, setTab] = useState<"posts" | "users" | "settings">("posts");
   const [stats, setStats] = useState({ total_posts: 0, total_users: 0, total_votes: 0 });
@@ -22,14 +28,10 @@ export function AdminPanel() {
 
   useEffect(() => void verify(), []);
 
-  async function verify() {
-    const res = await fetch("/admin/api/verify", { credentials: "include" });
-    if (!res.ok) return setAuthorized(false);
-    setAuthorized(true);
-    await Promise.all([loadStats(), loadPosts(), loadUsers(), loadSettings()]);
+  useEffect(() => {
+    if (!authorized || !sb) return;
 
-    // ── Realtime Subscriptions ──────────────────────────────────────────
-    const postsChannel = supabase
+    const postsChannel = sb
       .channel("admin-posts")
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
         void loadPosts();
@@ -37,7 +39,7 @@ export function AdminPanel() {
       })
       .subscribe();
 
-    const usersChannel = supabase
+    const usersChannel = sb
       .channel("admin-users")
       .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => {
         void loadUsers();
@@ -45,7 +47,7 @@ export function AdminPanel() {
       })
       .subscribe();
 
-    const settingsChannel = supabase
+    const settingsChannel = sb
       .channel("admin-settings")
       .on("postgres_changes", { event: "*", schema: "public", table: "settings" }, () => {
         void loadSettings();
@@ -53,10 +55,17 @@ export function AdminPanel() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(postsChannel);
-      supabase.removeChannel(usersChannel);
-      supabase.removeChannel(settingsChannel);
+      sb.removeChannel(postsChannel);
+      sb.removeChannel(usersChannel);
+      sb.removeChannel(settingsChannel);
     };
+  }, [authorized, sb]);
+
+  async function verify() {
+    const res = await fetch("/admin/api/verify", { credentials: "include" });
+    if (!res.ok) return setAuthorized(false);
+    setAuthorized(true);
+    await Promise.all([loadStats(), loadPosts(), loadUsers(), loadSettings()]);
   }
 
   async function loadStats() {

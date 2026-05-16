@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Crosshair,
   Map,
@@ -17,14 +17,19 @@ import { Chip } from "@/components/ui/Chip";
 import { Toast } from "@/components/ui/Toast";
 import { CITY_LABELS } from "@/lib/constants";
 import { getOrCreateDeviceId, readStorage, writeStorage } from "@/lib/storage";
-import { supabase } from "@/lib/supabase";
+import { createRealtimeSupabase } from "@/lib/supabase";
 import type { AuthUser, PostRow } from "@/types/models";
 
-type Props = { yandexApiKey: string };
+type Props = { yandexApiKey: string; supabaseUrl: string; supabaseAnonKey: string };
 /** Which panel is open in the bottom sheet — null = sheet closed */
 type Panel = "new" | "settings" | "profile" | "details" | null;
 
-export function MainMapClient({ yandexApiKey }: Props) {
+export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Props) {
+  const supabase = useMemo(
+    () => createRealtimeSupabase(supabaseUrl, supabaseAnonKey),
+    [supabaseUrl, supabaseAnonKey]
+  );
+
   // ── Data ──────────────────────────────────────────────────────────────
   const [user, setUser] = useState<AuthUser | null>(null);
   const [posts, setPosts] = useState<PostRow[]>([]);
@@ -75,18 +80,18 @@ export function MainMapClient({ yandexApiKey }: Props) {
     void loadMe();
     void loadPosts();
 
-    // ── Realtime Subscription ───────────────────────────────────────────
     const channel = supabase
-      .channel("posts-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "posts" },
-        () => {
-          // Whenever something changes, reload the list to get fresh data with votes
-          scheduleReloadPosts();
-        }
-      )
-      .subscribe();
+      ? supabase
+          .channel("posts-realtime")
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "posts" },
+            () => {
+              scheduleReloadPosts();
+            }
+          )
+          .subscribe()
+      : null;
 
     const onVis     = () => { if (document.visibilityState === "visible") scheduleReloadPosts(); };
     const onOnline  = () => setOnline(true);
@@ -99,12 +104,12 @@ export function MainMapClient({ yandexApiKey }: Props) {
 
     return () => {
       if (reloadPostsDebounceRef.current) clearTimeout(reloadPostsDebounceRef.current);
-      supabase.removeChannel(channel);
+      if (supabase && channel) supabase.removeChannel(channel);
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("online",  onOnline);
       window.removeEventListener("offline", onOffline);
     };
-  }, []);
+  }, [supabase]);
 
   useEffect(() => writeStorage("dps45_city", city), [city]);
   useEffect(() => writeStorage("dps45_marker_size", markerSize), [markerSize]);
