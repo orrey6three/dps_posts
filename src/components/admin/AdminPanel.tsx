@@ -1,16 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { LogOut, Map, MapPin, Settings as SettingsIcon, ThumbsUp, Trash2, Users } from "lucide-react";
 import { AdminLogin } from "@/components/admin/AdminLogin";
 import { AdminPosts } from "@/components/admin/AdminPosts";
 import { AdminUsers } from "@/components/admin/AdminUsers";
+import { AdminSettings } from "@/components/admin/AdminSettings";
+import { Brand } from "@/components/ui/Brand";
+import { Button } from "@/components/ui/Button";
+import { Toast } from "@/components/ui/Toast";
+import { supabase } from "@/lib/supabase";
 
 export function AdminPanel() {
   const [authorized, setAuthorized] = useState(false);
-  const [tab, setTab] = useState<"posts" | "users">("posts");
+  const [tab, setTab] = useState<"posts" | "users" | "settings">("posts");
   const [stats, setStats] = useState({ total_posts: 0, total_users: 0, total_votes: 0 });
   const [posts, setPosts] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [settings, setSettings] = useState<any[]>([]);
   const [notice, setNotice] = useState("");
 
   useEffect(() => void verify(), []);
@@ -19,7 +26,37 @@ export function AdminPanel() {
     const res = await fetch("/admin/api/verify", { credentials: "include" });
     if (!res.ok) return setAuthorized(false);
     setAuthorized(true);
-    await Promise.all([loadStats(), loadPosts(), loadUsers()]);
+    await Promise.all([loadStats(), loadPosts(), loadUsers(), loadSettings()]);
+
+    // ── Realtime Subscriptions ──────────────────────────────────────────
+    const postsChannel = supabase
+      .channel("admin-posts")
+      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
+        void loadPosts();
+        void loadStats();
+      })
+      .subscribe();
+
+    const usersChannel = supabase
+      .channel("admin-users")
+      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => {
+        void loadUsers();
+        void loadStats();
+      })
+      .subscribe();
+
+    const settingsChannel = supabase
+      .channel("admin-settings")
+      .on("postgres_changes", { event: "*", schema: "public", table: "settings" }, () => {
+        void loadSettings();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(postsChannel);
+      supabase.removeChannel(usersChannel);
+      supabase.removeChannel(settingsChannel);
+    };
   }
 
   async function loadStats() {
@@ -35,6 +72,22 @@ export function AdminPanel() {
   async function loadUsers() {
     const res = await fetch("/admin/api/users", { credentials: "include" });
     if (res.ok) setUsers((await res.json()).users ?? []);
+  }
+
+  async function loadSettings() {
+    const res = await fetch("/admin/api/settings", { credentials: "include" });
+    if (res.ok) setSettings((await res.json()).settings ?? []);
+  }
+
+  async function updateSetting(key: string, value: any) {
+    const res = await fetch("/admin/api/settings", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, value })
+    });
+    if (!res.ok) return setNotice("Ошибка обновления настроек");
+    await loadSettings();
   }
 
   async function login(password: string) {
@@ -95,42 +148,112 @@ export function AdminPanel() {
   }
 
   async function removeUser(id: string) {
+    if (!confirm("Удалить пользователя навсегда?")) return;
     await fetch(`/admin/api/users/${id}`, { method: "DELETE", credentials: "include" });
     await Promise.all([loadUsers(), loadStats()]);
+  }
+
+  async function toggleUserBan(id: string, isBanned: boolean) {
+    const res = await fetch(`/admin/api/users/${id}/shadowban`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isShadowbanned: isBanned })
+    });
+    if (!res.ok) return setNotice("Не удалось изменить статус бана");
+    setNotice(isBanned ? "Пользователь забанен" : "Пользователь разбанен");
+    await loadUsers();
   }
 
   if (!authorized) return <AdminLogin onLogin={login} />;
 
   return (
-    <main className="admin-shell">
-      <header className="card row">
-        <strong>DPS45 Админ</strong>
-        <span className="muted">Метки: {stats.total_posts}</span>
-        <span className="muted">Пользователи: {stats.total_users}</span>
-        <span className="muted">Голоса: {stats.total_votes}</span>
-        <button className="button button-danger" onClick={logout}>
-          Выйти
-        </button>
+    <main className="mx-auto flex max-w-6xl flex-col gap-3 px-3 py-4 sm:px-6 sm:py-6">
+      {/* Header */}
+      <header className="ui-card !flex-row !items-center !justify-between flex-wrap gap-3">
+        <Brand subtitle="Админ-панель" online />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatPill icon={<MapPin className="h-3.5 w-3.5" />} label="Метки" value={stats.total_posts} />
+          <StatPill icon={<Users className="h-3.5 w-3.5" />} label="Юзеры" value={stats.total_users} />
+          <StatPill icon={<ThumbsUp className="h-3.5 w-3.5" />} label="Голоса" value={stats.total_votes} />
+          <div className="h-6 w-px bg-[color:var(--color-hairline)] mx-1 hidden sm:block" />
+          <a href="/" className="ui-btn ui-btn-ghost !min-h-[38px] !py-1.5">
+            <Map className="h-4 w-4" aria-hidden />
+            <span className="hidden sm:inline">На карту</span>
+          </a>
+          <Button variant="ghost" onClick={logout} aria-label="Выйти из админ-панели" className="!min-h-[38px] !py-1.5">
+            <LogOut className="h-4 w-4" aria-hidden />
+            <span className="hidden sm:inline">Выйти</span>
+          </Button>
+        </div>
       </header>
-      <div className="row">
-        <button className={`button ${tab === "posts" ? "button-primary" : "button-soft"}`} onClick={() => setTab("posts")}>
-          Метки
-        </button>
-        <button className={`button ${tab === "users" ? "button-primary" : "button-soft"}`} onClick={() => setTab("users")}>
-          Пользователи
-        </button>
-      </div>
-      <div className="row wrap">
-        <button type="button" className="button button-soft" onClick={() => void clearAllVotes()}>
+
+      {/* Tabs + global action */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div role="tablist" aria-label="Разделы админ-панели" className="ui-segment grid-cols-2 sm:w-auto sm:inline-grid sm:grid-flow-col">
+          <TabButton active={tab === "posts"} onClick={() => setTab("posts")} icon={<MapPin className="h-4 w-4" aria-hidden />}>
+            Метки
+          </TabButton>
+          <TabButton active={tab === "users"} onClick={() => setTab("users")} icon={<Users className="h-4 w-4" aria-hidden />}>
+            Пользователи
+          </TabButton>
+          <TabButton active={tab === "settings"} onClick={() => setTab("settings")} icon={<SettingsIcon className="h-4 w-4" aria-hidden />}>
+            Настройки
+          </TabButton>
+        </div>
+        <Button variant="warning" onClick={() => void clearAllVotes()}>
+          <Trash2 className="h-4 w-4" aria-hidden />
           Очистить все голоса
-        </button>
+        </Button>
       </div>
-      {tab === "posts" ? (
+
+      {tab === "posts" && (
         <AdminPosts posts={posts} onSave={savePost} onDelete={removePost} onClearVotes={clearVotesForPost} />
-      ) : (
-        <AdminUsers users={users} onDelete={removeUser} />
       )}
-      {notice && <div className="notice">{notice}</div>}
+      {tab === "users" && (
+        <AdminUsers users={users} onDelete={removeUser} onToggleBan={toggleUserBan} />
+      )}
+      {tab === "settings" && (
+        <AdminSettings settings={settings} onSave={updateSetting} />
+      )}
+      {notice && <Toast>{notice}</Toast>}
     </main>
+  );
+}
+
+function StatPill({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+  return (
+    <span className="ui-stat">
+      <span aria-hidden style={{ color: "var(--color-brand-accent)" }}>
+        {icon}
+      </span>
+      <span className="ui-soft hidden sm:inline">{label}:</span>
+      <strong>{value}</strong>
+    </span>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  icon,
+  children
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`ui-segment-btn ${active ? "ui-segment-btn-active" : ""}`}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
