@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { registerUser, setSessionCookies } from "@/server/auth";
 import { routeError } from "@/server/errors";
+import { getClientIp } from "@/server/requestIp";
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,7 +9,7 @@ export async function POST(request: NextRequest) {
     if (!username || !password) {
       return NextResponse.json({ error: "Имя пользователя и пароль обязательны" }, { status: 400 });
     }
-    const ip = request.headers.get("x-forwarded-for") || request.ip;
+    const ip = getClientIp(request);
     const user = await registerUser(username, password, ip ?? undefined);
     await setSessionCookies(user);
     return NextResponse.json({ success: true, user }, { status: 201 });
