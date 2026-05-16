@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from "@/server/db";
+import { supabaseAdmin } from "@/server/db";
 import { HttpError } from "@/server/errors";
 import type { MarkerType, PostInput, PostRow } from "@/types/models";
 
@@ -34,9 +34,22 @@ export async function cleanupOldPosts() {
   ]);
 }
 
+/** Не блокирует выдачу списка: DELETE на каждый GET сильно тормозил API. */
+let postsCleanupDeadline = 0;
+
+function scheduleCleanupOldPostsNonBlocking() {
+  const now = Date.now();
+  if (now < postsCleanupDeadline) return;
+  postsCleanupDeadline = now + 3 * 60 * 1000;
+  void cleanupOldPosts().catch((err) => {
+    console.error("[posts] cleanupOldPosts", err);
+    postsCleanupDeadline = 0;
+  });
+}
+
 export async function getPostsWithStats(currentUserId?: string | null) {
-  await cleanupOldPosts();
-  const { data, error } = await supabase.rpc("get_post_stats");
+  scheduleCleanupOldPostsNonBlocking();
+  const { data, error } = await supabaseAdmin.rpc("get_post_stats");
   if (error) throw new HttpError(500, "Не удалось загрузить посты");
   
   const posts = (data ?? []) as PostRow[];

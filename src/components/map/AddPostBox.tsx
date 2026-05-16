@@ -1,5 +1,9 @@
 "use client";
 
+import { Crosshair, Send, Tag } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
+import { Textarea } from "@/components/ui/Input";
 import { MARKER_TYPES, TAGS_BY_TYPE } from "@/lib/constants";
 
 type Props = {
@@ -25,50 +29,77 @@ export function AddPostBox(props: Props) {
   }
 
   return (
-    <div className="card">
-      <h3>Новая метка</h3>
-      <p className="muted">
-        {props.pendingCoords
-          ? `Точка: ${props.pendingCoords[0].toFixed(5)}, ${props.pendingCoords[1].toFixed(5)}`
-          : "Нажмите «Выбрать точку» и кликните по карте"}
-      </p>
-      <div className="row wrap">
-        {MARKER_TYPES.map((value) => (
-          <button
-            key={value}
-            className={`chip ${props.type === value ? "chip-active" : ""}`}
-            onClick={() => props.setType(value)}
-          >
-            {value}
-          </button>
-        ))}
+    <div className="ui-section">
+      {/* Coords readout — премиальная dashed-зона */}
+      <div
+        className="flex items-center gap-2 rounded-[12px] px-3 py-2.5 text-[12px] transition-all duration-200"
+        style={{
+          background: props.pendingCoords ? "rgba(239, 68, 68, 0.08)" : "rgba(255, 255, 255, 0.66)",
+          border: `1px dashed ${props.pendingCoords ? "var(--color-brand-accent)" : "var(--color-border-strong)"}`,
+          color: props.pendingCoords ? "var(--color-brand-accent)" : "var(--color-ink-muted)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)"
+        }}
+      >
+        <Crosshair
+          className={`h-4 w-4 shrink-0 ${props.addMode ? "animate-pulse text-[color:var(--color-brand-accent)]" : ""}`}
+          aria-hidden
+        />
+        {props.pendingCoords ? (
+          <span className="ui-mono truncate text-[12px] font-semibold">
+            {props.pendingCoords[0].toFixed(5)}, {props.pendingCoords[1].toFixed(5)}
+          </span>
+        ) : (
+          <span>{props.addMode ? "Кликните на карте, чтобы поставить точку" : "Нажмите «Выбрать точку» и кликните по карте"}</span>
+        )}
       </div>
-      {availableTags.length > 0 && (
-        <div className="row wrap">
-          {availableTags.map((tag) => (
-            <button
-              key={tag}
-              className={`chip ${props.tags.includes(tag) ? "chip-active" : ""}`}
-              onClick={() => toggleTag(tag)}
-            >
-              #{tag}
-            </button>
+
+      <div className="grid gap-1.5">
+        <span className="ui-eyebrow">Тип</span>
+        <div className="flex flex-wrap gap-1.5">
+          {MARKER_TYPES.map((value) => (
+            <Chip key={value} active={props.type === value} onClick={() => props.setType(value)}>
+              {value}
+            </Chip>
           ))}
         </div>
+      </div>
+
+      {availableTags.length > 0 && (
+        <div className="grid gap-1.5">
+          <span className="ui-eyebrow flex items-center gap-1">
+            <Tag className="h-3 w-3" aria-hidden />
+            Теги
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {availableTags.map((tag) => (
+              <Chip key={tag} active={props.tags.includes(tag)} onClick={() => toggleTag(tag)}>
+                #{tag}
+              </Chip>
+            ))}
+          </div>
+        </div>
       )}
-      <textarea
-        className="input"
-        value={props.comment}
-        onChange={(e) => props.setComment(e.target.value)}
-        placeholder="Комментарий (необязательно)"
-      />
-      <div className="row">
-        <button className={`button ${props.addMode ? "button-warning" : "button-soft"}`} onClick={props.onStartAdd}>
+
+      <label className="grid gap-1">
+        <span className="ui-eyebrow">Комментарий</span>
+        <Textarea
+          value={props.comment}
+          onChange={(e) => props.setComment(e.target.value)}
+          placeholder="Что важно знать другим водителям?"
+          rows={2}
+          aria-label="Комментарий"
+        />
+      </label>
+
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant={props.addMode ? "warning" : "ghost"} onClick={props.onStartAdd}>
+          <Crosshair className={`h-4 w-4 ${props.addMode ? "animate-pulse" : ""}`} aria-hidden />
           {props.addMode ? "Ожидаю клик…" : "Выбрать точку"}
-        </button>
-        <button className="button button-primary" onClick={props.onSubmit}>
+        </Button>
+        <Button variant="primary" onClick={props.onSubmit} disabled={!props.pendingCoords}>
+          <Send className="h-4 w-4" aria-hidden />
           Опубликовать
-        </button>
+        </Button>
       </div>
     </div>
   );

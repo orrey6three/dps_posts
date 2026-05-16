@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DPS45",
-  description: "Народная карта постов ДПС",
+  title: "DPS45 · Народная карта",
+  description: "Народная карта меток ДПС в реальном времени",
   applicationName: "DPS45",
   appleWebApp: {
     capable: true,
     title: "DPS45",
-    statusBarStyle: "black-translucent"
+    statusBarStyle: "default"
   },
   formatDetection: {
     telephone: false
@@ -19,16 +19,13 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#edf3f7" },
-    { media: "(prefers-color-scheme: dark)", color: "#07070a" }
-  ]
+  themeColor: "#fbfaff"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru">
-      <body>{children}</body>
+      <body className="font-sans antialiased">{children}</body>
     </html>
   );
 }

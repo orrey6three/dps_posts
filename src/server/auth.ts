@@ -22,7 +22,7 @@ export function verifyToken(token: string) {
   }
 }
 
-export async function registerUser(username: string, password: string) {
+export async function registerUser(username: string, password: string, ip?: string) {
   const { data: existing } = await supabaseAdmin
     .from("users")
     .select("id")
@@ -33,42 +33,50 @@ export async function registerUser(username: string, password: string) {
   const password_hash = await bcrypt.hash(password, 10);
   const { data, error } = await supabaseAdmin
     .from("users")
-    .insert([{ username, password_hash, role: "user" }])
+    .insert([{ username, password_hash, role: "user", last_ip: ip }])
     .select("id, username, role, created_at")
     .single();
   if (error || !data) throw new HttpError(400, "Ошибка регистрации");
   return data as AuthUser;
 }
 
-export async function loginUser(username: string, password: string) {
+export async function loginUser(username: string, password: string, ip?: string) {
   if (username === "admin" && password === env.adminPassword) {
     const { data } = await supabaseAdmin
       .from("users")
       .select("id, username, role")
       .eq("username", "admin")
       .single();
-    if (data) return data as AuthUser;
-
-    const { data: created, error } = await supabaseAdmin
-      .from("users")
-      .insert([{ username: "admin", password_hash: "LOCAL_ADMIN", role: "admin" }])
-      .select("id, username, role")
-      .single();
-    if (error || !created) {
-      throw new HttpError(500, "Не удалось создать пользователя администратора");
+    
+    let adminUser: any = data;
+    if (!data) {
+      const { data: created, error } = await supabaseAdmin
+        .from("users")
+        .insert([{ username: "admin", password_hash: "LOCAL_ADMIN", role: "admin", last_ip: ip }])
+        .select("id, username, role")
+        .single();
+      if (error || !created) throw new HttpError(500, "Не удалось создать администратора");
+      adminUser = created;
+    } else if (ip) {
+      await supabaseAdmin.from("users").update({ last_ip: ip }).eq("id", data.id);
     }
-    return created as AuthUser;
+    return adminUser as AuthUser;
   }
 
   const { data, error } = await supabaseAdmin
     .from("users")
-    .select("id, username, role, password_hash")
+    .select("id, username, role, password_hash, is_shadowbanned")
     .eq("username", username)
     .single();
   if (error || !data) throw new HttpError(401, "Неверное имя пользователя или пароль");
 
   const ok = await bcrypt.compare(password, data.password_hash);
   if (!ok) throw new HttpError(401, "Неверное имя пользователя или пароль");
+
+  if (ip) {
+    await supabaseAdmin.from("users").update({ last_ip: ip }).eq("id", data.id);
+  }
+
   return { id: data.id, username: data.username, role: data.role } as AuthUser;
 }
 

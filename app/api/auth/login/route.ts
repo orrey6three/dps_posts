@@ -8,7 +8,8 @@ export async function POST(request: NextRequest) {
     if (!username || !password) {
       return NextResponse.json({ error: "Имя пользователя и пароль обязательны" }, { status: 400 });
     }
-    const user = await loginUser(username, password);
+    const ip = request.headers.get("x-forwarded-for") || request.ip;
+    const user = await loginUser(username, password, ip ?? undefined);
     await setSessionCookies(user);
     return NextResponse.json({ success: true, user, message: "Вход выполнен" });
   } catch (error) {

@@ -29,7 +29,7 @@ export async function getDashboardStats() {
 export async function getUsers() {
   const { data, error } = await supabaseAdmin
     .from("users")
-    .select("id, username, role, created_at, is_shadowbanned")
+    .select("id, username, role, created_at, is_shadowbanned, last_ip")
     .order("created_at", { ascending: false });
   if (error) throw new HttpError(500, "Не удалось загрузить пользователей");
   const users = data ?? [];
@@ -65,4 +65,18 @@ export async function deleteUser(userId: string) {
   await supabaseAdmin.from("posts").update({ user_id: null }).eq("user_id", userId);
   const { error } = await supabaseAdmin.from("users").delete().eq("id", userId);
   if (error) throw new HttpError(500, "Не удалось удалить пользователя");
+}
+
+export async function getSettings() {
+  const { data, error } = await supabaseAdmin.from("settings").select("*");
+  if (error) throw new HttpError(500, "Не удалось загрузить настройки");
+  return data ?? [];
+}
+
+export async function updateSetting(key: string, value: any) {
+  const { error } = await supabaseAdmin
+    .from("settings")
+    .update({ value, updated_at: new Date().toISOString() })
+    .eq("key", key);
+  if (error) throw new HttpError(500, "Не удалось обновить настройку");
 }
