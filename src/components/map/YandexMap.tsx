@@ -24,6 +24,29 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** Тип из БД + запасной title; неизвестное → ДПС (красно-синяя метка по смыслу карты). */
+function canonicalMarkerType(post: Pick<PostRow, "type" | "title">): string {
+  const raw = String(post.type ?? "")
+    .trim()
+    .normalize("NFC");
+  const ttl = String(post.title ?? "")
+    .trim()
+    .normalize("NFC");
+
+  const classify = (s: string): string | null => {
+    if (!s) return null;
+    if (s === "Патруль") return "Патруль";
+    if (s === "ДПС") return "ДПС";
+    if (s.toLowerCase() === "dps") return "ДПС";
+    if (s === "Нужна помощь") return "Нужна помощь";
+    if (s === "Чисто") return "Чисто";
+    if (s === "Вопрос") return "Вопрос";
+    return null;
+  };
+
+  return classify(raw) ?? classify(ttl) ?? "ДПС";
+}
+
 export const YandexMap = memo(function YandexMap({
   apiKey,
   posts,
@@ -149,11 +172,12 @@ export const YandexMap = memo(function YandexMap({
     const desiredIds = new Set<string>();
     const desired: { post: PostRow; sig: string; expired: boolean; pulse: boolean }[] = [];
     posts.forEach((post) => {
+      const markerKind = canonicalMarkerType(post);
       const relevantTime = post.last_relevant ?? post.created_at;
-      const ttl = post.type === "Патруль" ? 5 * 60 * 1000 : 60 * 60 * 1000;
+      const ttl = markerKind === "Патруль" ? 5 * 60 * 1000 : 60 * 60 * 1000;
       const expired = isExpired(relevantTime, ttl) || post.irrelevant_count > 0;
       const pulse = !reduced && !expired;
-      const sig = `${post.type}|${post.latitude}|${post.longitude}|${expired ? 1 : 0}|${pulse ? 1 : 0}|${headSize}|${post.comment ?? ""}`;
+      const sig = `${markerKind}|${post.latitude}|${post.longitude}|${expired ? 1 : 0}|${pulse ? 1 : 0}|${headSize}|${post.comment ?? ""}`;
       desiredIds.add(post.post_id);
       desired.push({ post, sig, expired, pulse });
     });
@@ -179,13 +203,14 @@ export const YandexMap = memo(function YandexMap({
     desired.forEach(({ post, sig, expired, pulse }) => {
       if (placemarksRef.current.has(post.post_id)) return;
 
+      const markerKind = canonicalMarkerType(post);
       let line: any = null;
-      if (post.type === "Патруль" && post.street_geometry?.length) {
+      if (markerKind === "Патруль" && post.street_geometry?.length) {
         line = new window.ymaps.Polyline(post.street_geometry, {}, { strokeColor: "#ef4444", strokeWidth: 6 });
         map.geoObjects.add(line);
       }
 
-      const layout = getLayout(post.type, expired, pulse);
+      const layout = getLayout(markerKind, expired, pulse);
       const placemark = new window.ymaps.Placemark(
         [post.latitude, post.longitude],
         { hintContent: null, balloonContent: post.comment ?? "" },
@@ -262,6 +287,9 @@ export const YandexMap = memo(function YandexMap({
   );
 });
 
+/** Машинка внутри красного круга ДПС (Lucide Car), без смены формы маркера */
+const MARKER_ICON_DPS_CAR = `<svg class="marker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(0 -1)"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.3-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></g></svg>`;
+
 function buildMarkerHTML(
   type: string,
   headSize: number,
@@ -276,6 +304,9 @@ function buildMarkerHTML(
   if (type === "Патруль") {
     themeClass = "marker-patrol";
     svg = `<svg class="marker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 16h-4m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a2 2 0 0 0-1.6-.8H9.3a2 2 0 0 0-1.6.8L5 11l-5.16.86a1 1 0 0 0-.84.99V16h3m10 0a2 2 0 1 0-4 0m4 0a2 2 0 1 1-4 0m-7 0a2 2 0 1 0-4 0m4 0a2 2 0 1 1-4 0"/></svg>`;
+  } else if (type === "ДПС") {
+    themeClass = "marker-dps";
+    svg = MARKER_ICON_DPS_CAR;
   } else if (type === "Нужна помощь") {
     themeClass = "marker-help";
     svg = `<svg class="marker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><circle cx="12" cy="16" r="0.5" fill="currentColor"/></svg>`;
@@ -286,21 +317,26 @@ function buildMarkerHTML(
     themeClass = "marker-question";
     svg = `<svg class="marker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>`;
   } else {
-    themeClass = "marker-patrol";
-    svg = `<svg class="marker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`;
+    themeClass = "marker-dps";
+    svg = MARKER_ICON_DPS_CAR;
   }
 
   const pulse = showPulse ? `<div class="marker-pulse"></div>` : "";
   const totalH = headSize + spikeH;
   const expiredClass = expired ? "marker-expired" : "";
 
+  const spikeHtml =
+    themeClass === "marker-dps"
+      ? `<div class="marker-spike marker-spike-dps" style="width:${Math.round(headSize * 0.9)}px;height:${spikeH}px;"></div>`
+      : `<div class="marker-spike" style="border-left-width:${spikeHW}px;border-right-width:${spikeHW}px;border-top-width:${spikeH}px;"></div>`;
+
   return `
-    <div class="custom-marker ${themeClass} ${expiredClass}" style="width:${headSize}px;height:${totalH}px;">
+    <div class="custom-marker ${themeClass} ${expiredClass}" style="width:${headSize}px;height:${totalH}px;--mh:${headSize}px;">
       <div class="marker-head" style="width:${headSize}px;height:${headSize}px;">
         ${pulse}
         ${svg}
       </div>
-      <div class="marker-spike" style="border-left-width:${spikeHW}px;border-right-width:${spikeHW}px;border-top-width:${spikeH}px;"></div>
+      ${spikeHtml}
     </div>
   `;
 }

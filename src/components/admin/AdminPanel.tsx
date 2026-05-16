@@ -170,7 +170,7 @@ export function AdminPanel({ supabaseUrl, supabaseAnonKey, yandexApiKey }: Props
       body: JSON.stringify({ isShadowbanned: isBanned })
     });
     if (!res.ok) return setNotice("Не удалось изменить статус бана");
-    setNotice(isBanned ? "Пользователь забанен" : "Пользователь разбанен");
+    setNotice(isBanned ? "Пользователь заблокирован" : "Пользователь разблокирован");
     await loadUsers();
   }
 

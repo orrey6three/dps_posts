@@ -79,7 +79,7 @@ export function AdminUsers({ users, onDelete, onToggleBan }: Props) {
                           onClick={() => onToggleBan(user.id, !user.is_shadowbanned)}
                           className="!min-h-[32px] !py-1"
                         >
-                          {user.is_shadowbanned ? "Разбанить" : "Забанить"}
+                          {user.is_shadowbanned ? "Разблокировать" : "Заблокировать"}
                         </Button>
                         <Button
                           variant="danger"
