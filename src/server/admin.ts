@@ -73,10 +73,10 @@ export async function getSettings() {
   return data ?? [];
 }
 
-export async function updateSetting(key: string, value: any) {
-  const { error } = await supabaseAdmin
-    .from("settings")
-    .update({ value, updated_at: new Date().toISOString() })
-    .eq("key", key);
+export async function updateSetting(key: string, value: unknown) {
+  const { error } = await supabaseAdmin.from("settings").upsert(
+    { key, value, updated_at: new Date().toISOString() },
+    { onConflict: "key" }
+  );
   if (error) throw new HttpError(500, "Не удалось обновить настройку");
 }

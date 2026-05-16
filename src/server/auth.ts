@@ -102,3 +102,24 @@ export async function clearSessionCookies() {
   store.delete(AUTH_COOKIE);
   store.delete(ADMIN_COOKIE);
 }
+
+export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
+  if (newPassword.length < 6) throw new HttpError(400, "Новый пароль: минимум 6 символов");
+
+  const { data, error } = await supabaseAdmin
+    .from("users")
+    .select("password_hash")
+    .eq("id", userId)
+    .single();
+  if (error || !data) throw new HttpError(404, "Пользователь не найден");
+  if (data.password_hash === "LOCAL_ADMIN") {
+    throw new HttpError(400, "Для этого аккаунта смена пароля здесь недоступна");
+  }
+
+  const ok = await bcrypt.compare(currentPassword, data.password_hash);
+  if (!ok) throw new HttpError(401, "Текущий пароль указан неверно");
+
+  const password_hash = await bcrypt.hash(newPassword, 10);
+  const { error: upErr } = await supabaseAdmin.from("users").update({ password_hash }).eq("id", userId);
+  if (upErr) throw new HttpError(500, "Не удалось сохранить новый пароль");
+}

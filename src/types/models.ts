@@ -8,6 +8,17 @@ export interface AuthUser {
   role: "user" | "admin";
   created_at?: string;
   is_shadowbanned?: boolean;
+  /** ISO; активная «поддержка» если в будущем */
+  subscription_until?: string | null;
+  /** Публичный URL аватара (Supabase Storage) */
+  avatar_url?: string | null;
+}
+
+export interface UserPublicStats {
+  posts_created: number;
+  relevant_votes_received: number;
+  reputation: number;
+  level: number;
 }
 
 export interface JwtUser {

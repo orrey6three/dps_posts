@@ -1,7 +1,8 @@
 "use client";
 
 import { memo, useEffect, useRef } from "react";
-import { CITY_COORDS, CLUSTER_MIN_MARKERS, MAP_AREA_LIMITS } from "@/lib/constants";
+import type { MapBounds } from "@/lib/cities";
+import { CLUSTER_MIN_MARKERS } from "@/lib/constants";
 import { isExpired } from "@/lib/format";
 import { loadYandexMaps } from "@/lib/yandex";
 import type { PostRow } from "@/types/models";
@@ -9,7 +10,9 @@ import type { PostRow } from "@/types/models";
 type Props = {
   apiKey: string;
   posts: PostRow[];
-  city: string;
+  mapCenter: [number, number];
+  /** Свои границы города → ограничение тайлов (restrictMapArea). */
+  mapBounds: MapBounds;
   markerSize: number;
   addMode: boolean;
   onMapClick: (coords: [number, number]) => void;
@@ -24,7 +27,8 @@ function prefersReducedMotion(): boolean {
 export const YandexMap = memo(function YandexMap({
   apiKey,
   posts,
-  city,
+  mapCenter,
+  mapBounds,
   markerSize,
   addMode,
   onMapClick,
@@ -32,6 +36,8 @@ export const YandexMap = memo(function YandexMap({
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
+  const mapBoundsRef = useRef(mapBounds);
+  mapBoundsRef.current = mapBounds;
   const placemarksRef = useRef<Map<string, { pm: any; sig: string; line: any | null }>>(new Map());
   const clusterRef = useRef<any>(null);
   const layoutCacheRef = useRef<Map<string, any>>(new Map());
@@ -55,14 +61,14 @@ export const YandexMap = memo(function YandexMap({
         mapRef.current = new ymaps.Map(
           hostRef.current,
           {
-            center: CITY_COORDS[city] ?? CITY_COORDS.shumikha,
+            center: mapCenter,
             zoom: 12,
             type: "yandex#map",
             controls: ["zoomControl", "geolocationControl"]
           },
           {
             suppressMapOpenBlock: true,
-            restrictMapArea: MAP_AREA_LIMITS,
+            restrictMapArea: mapBoundsRef.current,
             minZoom: 10,
             maxZoom: 18,
             showHintOnHover: false
@@ -106,16 +112,26 @@ export const YandexMap = memo(function YandexMap({
   }, [apiKey]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.options?.set) return;
+    try {
+      map.options.set({ restrictMapArea: mapBounds });
+    } catch {
+      /* noop — крайне старые сборки API */
+    }
+  }, [mapBounds]);
+
+  useEffect(() => {
     if (!mapRef.current) return;
-    mapRef.current.setCenter(CITY_COORDS[city] ?? CITY_COORDS.shumikha, 13, { duration: 500 });
-  }, [city]);
+    mapRef.current.setCenter(mapCenter, 13, { duration: 500 });
+  }, [mapCenter]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !window.ymaps) return;
 
     const reduced = prefersReducedMotion();
-    const headSize = Math.max(markerSize, 36);
+    const headSize = markerSize;
     const spikeHW  = Math.round(headSize * 0.26);
     const spikeH   = Math.round(headSize * 0.52);
     const totalH   = headSize + spikeH;

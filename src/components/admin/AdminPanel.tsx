@@ -11,9 +11,9 @@ import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
 import { createRealtimeSupabase } from "@/lib/supabase";
 
-type Props = { supabaseUrl: string; supabaseAnonKey: string };
+type Props = { supabaseUrl: string; supabaseAnonKey: string; yandexApiKey: string };
 
-export function AdminPanel({ supabaseUrl, supabaseAnonKey }: Props) {
+export function AdminPanel({ supabaseUrl, supabaseAnonKey, yandexApiKey }: Props) {
   const sb = useMemo(
     () => createRealtimeSupabase(supabaseUrl, supabaseAnonKey),
     [supabaseUrl, supabaseAnonKey]
@@ -223,7 +223,7 @@ export function AdminPanel({ supabaseUrl, supabaseAnonKey }: Props) {
         <AdminUsers users={users} onDelete={removeUser} onToggleBan={toggleUserBan} />
       )}
       {tab === "settings" && (
-        <AdminSettings settings={settings} onSave={updateSetting} />
+        <AdminSettings settings={settings} yandexApiKey={yandexApiKey} onSave={updateSetting} />
       )}
       {notice && <Toast>{notice}</Toast>}
     </main>

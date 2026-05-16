@@ -311,6 +311,15 @@ html, body {
   }
   .ui-section + .ui-section { margin-top: 10px; }
 
+  /* Секции внутри нижнего шита: без второй рамки — фон уже у .ui-sheet */
+  .ui-sheet-body .ui-section {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0.5rem 1.25rem 1.25rem;
+  }
+
   .ui-eyebrow {
     @apply text-[10px] font-semibold uppercase;
     letter-spacing: 0.08em;
@@ -413,15 +422,17 @@ html, body {
   }
 
   .ui-btn-danger {
-    background: linear-gradient(180deg, #dc2626 0%, var(--color-danger) 100%);
+    background: var(--color-brand-accent);
     color: var(--color-ink-on-accent);
-    border-color: var(--color-danger);
+    border-color: transparent;
     box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.2),
-      0 1px 2px rgba(127, 29, 29, 0.32);
+      0 4px 12px -4px rgba(239, 68, 68, 0.4),
+      0 1px 1px rgba(0, 0, 0, 0.05);
   }
   .ui-btn-danger:hover {
-    background: linear-gradient(180deg, var(--color-danger) 0%, var(--color-danger-hover) 100%);
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px -4px rgba(239, 68, 68, 0.5);
   }
 
   .ui-btn-warning {
@@ -437,12 +448,14 @@ html, body {
   .ui-chip {
     @apply inline-flex cursor-pointer items-center gap-1.5 px-3 py-1 text-[12px] font-medium transition-all duration-200;
     min-height: 28px;
+    box-sizing: border-box;
+    overflow: hidden;
     background: #fff;
     border: 1px solid var(--color-border);
-    border-radius: 6px;
+    border-radius: 999px;
     color: var(--color-ink-muted);
   }
-  .ui-chip:hover {
+  .ui-chip:hover:not(.ui-chip-active) {
     color: var(--color-ink);
     border-color: var(--color-border-strong);
     background: #fff;
@@ -453,12 +466,15 @@ html, body {
     outline-offset: 2px;
   }
   .ui-chip-active {
+    transform: none;
     background: var(--color-brand-accent);
     color: #fff;
-    border-color: #dc2626;
+    border-color: #b91c1c;
   }
   .ui-chip-active:hover {
+    transform: none;
     background: #dc2626;
+    border-color: #991b1b;
   }
 
   /* Tabs — sliding underline */
@@ -690,19 +706,11 @@ html, body {
     transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1),
                 max-height 320ms cubic-bezier(0.32, 0.72, 0, 1);
     overflow: hidden;
-    /* bottom padding clears the floating nav (64px height + 16px bottom + 12px gap) */
-    padding-bottom: 92px;
+    /* bottom padding: nav + FAB lift into scroll area */
+    padding-bottom: 124px;
     /* desktop: center with max-width */
     max-width: 540px;
     margin: 0 auto;
-  }
-  .ui-sheet::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95), transparent);
-    pointer-events: none;
   }
 
   /* Sheet handle */

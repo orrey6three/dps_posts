@@ -166,3 +166,42 @@ AND NOT EXISTS (
 CREATE INDEX IF NOT EXISTS idx_votes_post_id ON public.votes (post_id);
 CREATE INDEX IF NOT EXISTS idx_votes_post_id_created_at_desc ON public.votes (post_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_created_at_desc ON public.posts (created_at DESC);
+
+-- 7. Подписка / платежи (Stripe), каталог городов
+ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_until TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+
+INSERT INTO settings (key, value)
+VALUES (
+  'city_catalog',
+  $cities$[
+    {"id":"shumikha","label":"Шумиха","lat":55.2255,"lng":63.2982},
+    {"id":"shchuchye","label":"Щучье","lat":55.2133,"lng":62.7634},
+    {"id":"mishkino","label":"Мишкино","lat":55.3385,"lng":63.9168},
+    {"id":"kurgan","label":"Курган","lat":55.4444,"lng":65.3161},
+    {"id":"ketovo","label":"Кетово","lat":55.354,"lng":65.334},
+    {"id":"kurtamysh","label":"Куртамыш","lat":54.91,"lng":64.433},
+    {"id":"shadrinsk","label":"Шадринск","lat":56.086,"lng":63.634},
+    {"id":"vargashi","label":"Варгаши","lat":55.369,"lng":65.118},
+    {"id":"yurgamysh","label":"Юргамыш","lat":55.379,"lng":64.46},
+    {"id":"makushino","label":"Макушино","lat":55.21,"lng":67.251},
+    {"id":"petukhovo","label":"Петухово","lat":55.065,"lng":67.898},
+    {"id":"dalmatovo","label":"Далматово","lat":56.262,"lng":62.938},
+    {"id":"tyumen","label":"Тюмень","lat":57.1522,"lng":65.5272},
+    {"id":"yekaterinburg","label":"Екатеринбург","lat":56.8389,"lng":60.6057},
+    {"id":"chelyabinsk","label":"Челябинск","lat":55.1644,"lng":61.4368}
+  ]$cities$::jsonb
+)
+ON CONFLICT (key) DO NOTHING;
+
+-- 8. Аватары пользователей (Storage)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "avatars_public_read" ON storage.objects;
+CREATE POLICY "avatars_public_read"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'avatars');

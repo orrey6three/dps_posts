@@ -107,6 +107,53 @@ export function PostDetailsBox({ post, user, onVote, onDelete }: Props) {
         </div>
       </div>
 
+      {(post.relevant_count > 0 && post.last_relevant) ||
+      (post.irrelevant_count > 0 && post.last_irrelevant) ||
+      post.last_activity ? (
+        <div
+          className="rounded-[var(--radius-xl)] border border-[color:var(--color-border)] px-3 py-2.5 text-[12px] leading-snug"
+          style={{ background: "rgba(255,255,255,0.52)" }}
+        >
+          <div className="mb-1.5 inline-flex items-center gap-1.5 ui-eyebrow">
+            <CalendarClock className="h-3.5 w-3.5 text-[color:var(--color-brand-deep)]" aria-hidden />
+            Когда голосовали
+          </div>
+          <ul className="grid gap-1 text-[11px]" style={{ color: "var(--color-ink-muted)" }}>
+            {post.relevant_count > 0 && post.last_relevant ? (
+              <li>
+                <span className="font-semibold text-[color:var(--color-success)]">Актуально</span>
+                {" — "}
+                <span className="ui-mono">{formatDate(post.last_relevant)}</span>
+              </li>
+            ) : null}
+            {post.irrelevant_count > 0 && post.last_irrelevant ? (
+              <li>
+                <span className="font-semibold text-[color:var(--color-danger)]">Неактуально</span>
+                {" — "}
+                <span className="ui-mono">{formatDate(post.last_irrelevant)}</span>
+              </li>
+            ) : null}
+            {post.last_activity ? (
+              <li className="mt-1 border-t border-[color:var(--color-border)] pt-1.5">
+                Последний голос:{" "}
+                <span className="ui-mono">{formatDate(post.last_activity)}</span>
+                {post.last_voter_username ? (
+                  <>
+                    {" · "}
+                    {formatUsername(post.last_voter_username)}
+                    {post.last_vote_type === "relevant"
+                      ? " · актуально"
+                      : post.last_vote_type === "irrelevant"
+                        ? " · неактуально"
+                        : ""}
+                  </>
+                ) : null}
+              </li>
+            ) : null}
+          </ul>
+        </div>
+      ) : null}
+
       {post.tags?.length ? (
         <div className="flex flex-wrap gap-1.5">
           {post.tags.map((tag) => (

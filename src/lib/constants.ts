@@ -1,11 +1,14 @@
 /** Минимум точечных меток для включения кластеризации (React и legacy). */
 export const CLUSTER_MIN_MARKERS = 28;
 
-/** Юго-запад и северо-восток области карты (как в legacy app.js) — меньше лишних тайлов за пределами регионов. */
-export const MAP_AREA_LIMITS: [[number, number], [number, number]] = [
-  [54.8, 62.6],
-  [55.5, 64.1]
-];
+/** Размер кастомных маркеров на карте (пиксели головы пина). */
+export type MarkerSizePreset = "s" | "m" | "l";
+
+export const MARKER_PRESET_PX: Record<MarkerSizePreset, number> = {
+  s: 24,
+  m: 32,
+  l: 42,
+};
 
 export const CITY_COORDS: Record<string, [number, number]> = {
   shchuchye: [55.2133, 62.7634],

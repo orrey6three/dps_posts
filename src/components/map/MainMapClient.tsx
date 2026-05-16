@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Crosshair,
   Map,
   Plus,
   SlidersHorizontal,
   User as UserIcon,
-  ZoomIn,
 } from "lucide-react";
 import { AddPostBox } from "@/components/map/AddPostBox";
 import { AuthBox } from "@/components/map/AuthBox";
@@ -15,70 +14,86 @@ import { PostDetailsBox } from "@/components/map/PostDetailsBox";
 import { YandexMap } from "@/components/map/YandexMap";
 import { Chip } from "@/components/ui/Chip";
 import { Toast } from "@/components/ui/Toast";
-import { CITY_LABELS } from "@/lib/constants";
+import { CITY_COORDS, MARKER_PRESET_PX, type MarkerSizePreset } from "@/lib/constants";
+import { boundsAroundCenter, getCityMapBounds, type CityEntry } from "@/lib/cities";
 import { getOrCreateDeviceId, readStorage, writeStorage } from "@/lib/storage";
 import { createRealtimeSupabase } from "@/lib/supabase";
-import type { AuthUser, PostRow } from "@/types/models";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { fetchAppConfig } from "@/store/slices/mapAppConfigSlice";
+import { fetchMe, mapSessionActions } from "@/store/slices/mapSessionSlice";
+import { mapUiActions, type MapPanel } from "@/store/slices/mapUiSlice";
+import { fetchPosts } from "@/store/slices/postsSlice";
+import { store } from "@/store/store";
+import type { PostRow } from "@/types/models";
 
 type Props = { yandexApiKey: string; supabaseUrl: string; supabaseAnonKey: string };
-/** Which panel is open in the bottom sheet — null = sheet closed */
-type Panel = "new" | "settings" | "profile" | "details" | null;
+
+function loadMarkerPreset(): MarkerSizePreset {
+  const presetRaw = readStorage<string>("dps45_marker_preset", "");
+  if (presetRaw === "s" || presetRaw === "m" || presetRaw === "l") return presetRaw;
+  const px = readStorage("dps45_marker_size", 32);
+  if (typeof px === "number" && Number.isFinite(px)) {
+    if (px <= 27) return "s";
+    if (px <= 37) return "m";
+    return "l";
+  }
+  return "m";
+}
 
 export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Props) {
+  const dispatch = useAppDispatch();
+  const posts = useAppSelector((s) => s.posts.items);
+  const user = useAppSelector((s) => s.mapSession.user);
+  const userStats = useAppSelector((s) => s.mapSession.userStats);
+  const online = useAppSelector((s) => s.mapSession.online);
+  const cityCatalog = useAppSelector((s) => s.mapAppConfig.cityCatalog);
+  const stripeCheckoutEnabled = useAppSelector((s) => s.mapAppConfig.stripeCheckoutEnabled);
+  const donateUrl = useAppSelector((s) => s.mapAppConfig.donateUrl);
+
+  const city = useAppSelector((s) => s.mapUi.city);
+  const markerPreset = useAppSelector((s) => s.mapUi.markerPreset);
+  const selectedPost = useAppSelector((s) => s.mapUi.selectedPost);
+  const addMode = useAppSelector((s) => s.mapUi.addMode);
+  const pendingCoords = useAppSelector((s) => s.mapUi.pendingCoords);
+  const newType = useAppSelector((s) => s.mapUi.newType);
+  const newComment = useAppSelector((s) => s.mapUi.newComment);
+  const newTags = useAppSelector((s) => s.mapUi.newTags);
+  const activePanel = useAppSelector((s) => s.mapUi.activePanel);
+  const sheetExpanded = useAppSelector((s) => s.mapUi.sheetExpanded);
+  const notice = useAppSelector((s) => s.mapUi.notice);
+
   const supabase = useMemo(
     () => createRealtimeSupabase(supabaseUrl, supabaseAnonKey),
     [supabaseUrl, supabaseAnonKey]
   );
 
-  // ── Data ──────────────────────────────────────────────────────────────
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [posts, setPosts] = useState<PostRow[]>([]);
-  const [selectedPost, setSelectedPost] = useState<PostRow | null>(null);
-  const [city, setCity] = useState("shumikha");
-  const [markerSize, setMarkerSize] = useState(32);
-  const [online, setOnline] = useState(true);
-
-  // ── New-post form ─────────────────────────────────────────────────────
-  const [addMode, setAddMode] = useState(false);
-  const [pendingCoords, setPendingCoords] = useState<[number, number] | null>(null);
-  const [newType, setNewType] = useState("ДПС");
-  const [newComment, setNewComment] = useState("");
-  const [newTags, setNewTags] = useState<string[]>([]);
-
-  // ── UI ────────────────────────────────────────────────────────────────
-  const [activePanel, setActivePanel] = useState<Panel>(null);
-  const [sheetExpanded, setSheetExpanded] = useState(false);
-  const [notice, setNotice] = useState("");
-
-  const selectedPostRef = useRef<PostRow | null>(null);
-  useEffect(() => { selectedPostRef.current = selectedPost; }, [selectedPost]);
-  const postsSignatureRef = useRef<string>("");
   const reloadPostsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function scheduleReloadPosts() {
     if (reloadPostsDebounceRef.current) clearTimeout(reloadPostsDebounceRef.current);
     reloadPostsDebounceRef.current = setTimeout(() => {
       reloadPostsDebounceRef.current = null;
-      void loadPosts();
+      void dispatch(fetchPosts());
     }, 320);
   }
 
-  // Auto-dismiss toast
   useEffect(() => {
     if (!notice) return;
-    const t = setTimeout(() => setNotice(""), 3200);
+    const t = setTimeout(() => dispatch(mapUiActions.clearNotice()), 3200);
     return () => clearTimeout(t);
-  }, [notice]);
+  }, [notice, dispatch]);
 
-  // (панель открывается напрямую в onMarkerClick — без useEffect)
-
-  // ── Bootstrap ─────────────────────────────────────────────────────────
   useEffect(() => {
-    setCity(readStorage("dps45_city", "shumikha"));
-    setMarkerSize(readStorage("dps45_marker_size", 32));
+    dispatch(
+      mapUiActions.hydrateFromStorage({
+        city: readStorage("dps45_city", "shumikha"),
+        markerPreset: loadMarkerPreset(),
+      })
+    );
     getOrCreateDeviceId();
-    void loadMe();
-    void loadPosts();
+    void dispatch(fetchAppConfig());
+    void dispatch(fetchMe());
+    void dispatch(fetchPosts());
 
     const channel = supabase
       ? supabase
@@ -93,54 +108,44 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
           .subscribe()
       : null;
 
-    const onVis     = () => { if (document.visibilityState === "visible") scheduleReloadPosts(); };
-    const onOnline  = () => setOnline(true);
-    const onOffline = () => setOnline(false);
+    const onVis = () => {
+      if (document.visibilityState === "visible") scheduleReloadPosts();
+    };
+    const onOnline = () => dispatch(mapSessionActions.setOnline(true));
+    const onOffline = () => dispatch(mapSessionActions.setOnline(false));
 
     document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("online",  onOnline);
+    window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
-    if (typeof navigator !== "undefined") setOnline(navigator.onLine);
+    if (typeof navigator !== "undefined") dispatch(mapSessionActions.setOnline(navigator.onLine));
 
     return () => {
       if (reloadPostsDebounceRef.current) clearTimeout(reloadPostsDebounceRef.current);
       if (supabase && channel) supabase.removeChannel(channel);
       document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("online",  onOnline);
+      window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
     };
-  }, [supabase]);
+  }, [dispatch, supabase]);
 
-  useEffect(() => writeStorage("dps45_city", city), [city]);
-  useEffect(() => writeStorage("dps45_marker_size", markerSize), [markerSize]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const billing = new URLSearchParams(window.location.search).get("billing");
+    if (!billing) return;
+    if (billing === "success") dispatch(mapUiActions.setNotice("Подписка оформлена — спасибо!"));
+    if (billing === "cancel") dispatch(mapUiActions.setNotice("Оплата отменена"));
+    window.history.replaceState({}, "", window.location.pathname);
+    if (billing === "success") void dispatch(fetchMe());
+  }, [dispatch]);
 
-  // ── API helpers ───────────────────────────────────────────────────────
-  async function loadMe() {
-    const res = await fetch("/api/auth/me", { credentials: "include" });
-    if (res.ok) setUser((await res.json()).user);
-  }
+  useEffect(() => {
+    writeStorage("dps45_city", city);
+  }, [city]);
 
-  async function loadPosts() {
-    const res = await fetch("/api/posts", { cache: "no-store" });
-    if (!res.ok) return;
-    const data = await res.json();
-    const nextPosts: PostRow[] = data.posts ?? [];
-    const signature = nextPosts
-      .map(
-        (p) =>
-          `${p.post_id}:${p.last_activity ?? p.last_relevant ?? p.created_at}:${p.relevant_count}:${p.irrelevant_count}`
-      )
-      .join("|");
-    if (signature !== postsSignatureRef.current) {
-      postsSignatureRef.current = signature;
-      setPosts(nextPosts);
-    }
-    const sel = selectedPostRef.current;
-    if (sel) {
-      const updated = nextPosts.find((p) => p.post_id === sel.post_id);
-      if (updated && updated !== sel) setSelectedPost(updated);
-    }
-  }
+  useEffect(() => {
+    writeStorage("dps45_marker_preset", markerPreset);
+    writeStorage("dps45_marker_size", MARKER_PRESET_PX[markerPreset]);
+  }, [markerPreset]);
 
   async function auth(endpoint: "login" | "register", username: string, password: string) {
     const res = await fetch(`/api/auth/${endpoint}`, {
@@ -150,140 +155,188 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
       credentials: "include",
     });
     const data = await res.json();
-    if (!res.ok) return setNotice(data.error ?? "Ошибка авторизации");
-    setUser(data.user);
+    if (!res.ok) {
+      dispatch(mapUiActions.setNotice(data.error ?? "Ошибка авторизации"));
+      return;
+    }
     writeStorage("dps45_device_id", data.user.id);
-    setNotice(endpoint === "login" ? "Добро пожаловать" : "Аккаунт создан");
-    setActivePanel(null);
+    await dispatch(fetchMe());
+    dispatch(mapUiActions.setNotice(endpoint === "login" ? "Добро пожаловать" : "Аккаунт создан"));
+    dispatch(mapUiActions.setActivePanel(null));
   }
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    setUser(null);
-    setNotice("Вы вышли из аккаунта");
+    dispatch(mapSessionActions.clearSession());
+    dispatch(mapUiActions.setNotice("Вы вышли из аккаунта"));
+  }
+
+  async function handleChangePassword(currentPassword: string, newPassword: string) {
+    const res = await fetch("/api/auth/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Не удалось сменить пароль");
+    dispatch(mapUiActions.setNotice("Пароль обновлён"));
+  }
+
+  async function handleSubscribe() {
+    const res = await fetch("/api/billing/checkout", { method: "POST", credentials: "include" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      dispatch(mapUiActions.setNotice(typeof data.error === "string" ? data.error : "Онлайн-оплата недоступна"));
+      return;
+    }
+    if (typeof data.url === "string") window.location.href = data.url;
   }
 
   async function createMarker() {
-    if (!user) {
-      setActivePanel("profile");
-      return setNotice("Сначала войдите в аккаунт");
+    const { mapUi, mapSession, mapAppConfig } = store.getState();
+    if (!mapSession.user) {
+      dispatch(mapUiActions.setActivePanel("profile"));
+      dispatch(mapUiActions.setNotice("Сначала войдите в аккаунт"));
+      return;
     }
-    if (!pendingCoords) return setNotice("Сначала выберите точку на карте");
+    if (!mapUi.pendingCoords) {
+      dispatch(mapUiActions.setNotice("Сначала выберите точку на карте"));
+      return;
+    }
+    const cityLabel = mapAppConfig.cityCatalog.find((c) => c.id === mapUi.city)?.label ?? mapUi.city;
     const res = await fetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
-        title: newType,
-        type: newType,
-        comment: newComment,
-        tags: newTags,
-        latitude: pendingCoords[0],
-        longitude: pendingCoords[1],
-        address: `${CITY_LABELS[city]}`,
+        title: mapUi.newType,
+        type: mapUi.newType,
+        comment: mapUi.newComment,
+        tags: mapUi.newTags,
+        latitude: mapUi.pendingCoords[0],
+        longitude: mapUi.pendingCoords[1],
+        address: cityLabel,
       }),
     });
     const data = await res.json();
-    if (!res.ok) return setNotice(data.error ?? "Ошибка создания метки");
-    setPendingCoords(null);
-    setNewComment("");
-    setNewTags([]);
-    setNotice("Метка опубликована");
-    setActivePanel(null);
-    await loadPosts();
+    if (!res.ok) {
+      dispatch(mapUiActions.setNotice(data.error ?? "Ошибка создания метки"));
+      return;
+    }
+    dispatch(mapUiActions.resetNewMarkerDraft());
+    dispatch(mapUiActions.setNotice("Метка опубликована"));
+    dispatch(mapUiActions.setActivePanel(null));
+    await dispatch(fetchPosts());
   }
 
   async function vote(voteType: "relevant" | "irrelevant") {
-    if (!selectedPost) return;
+    const sp = store.getState().mapUi.selectedPost;
+    if (!sp) return;
     const res = await fetch("/api/vote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ post_id: selectedPost.post_id, vote_type: voteType }),
+      body: JSON.stringify({ post_id: sp.post_id, vote_type: voteType }),
     });
     const data = await res.json();
-    setNotice(data.message ?? data.error ?? "Готово");
-    await loadPosts();
+    dispatch(mapUiActions.setNotice(data.message ?? data.error ?? "Готово"));
+    await dispatch(fetchPosts());
   }
 
   async function deleteCurrentPost() {
-    if (!selectedPost) return;
-    const res = await fetch(`/api/posts/${selectedPost.post_id}`, {
+    const sp = store.getState().mapUi.selectedPost;
+    if (!sp) return;
+    const res = await fetch(`/api/posts/${sp.post_id}`, {
       method: "DELETE",
       credentials: "include",
     });
     const data = await res.json();
-    if (!res.ok) return setNotice(data.error ?? "Ошибка удаления");
-    setSelectedPost(null);
-    setActivePanel(null);
-    setNotice("Метка удалена");
-    await loadPosts();
+    if (!res.ok) {
+      dispatch(mapUiActions.setNotice(data.error ?? "Ошибка удаления"));
+      return;
+    }
+    dispatch(mapUiActions.setSelectedPost(null));
+    dispatch(mapUiActions.setActivePanel(null));
+    dispatch(mapUiActions.setNotice("Метка удалена"));
+    await dispatch(fetchPosts());
   }
 
-  // ── UI helpers ────────────────────────────────────────────────────────
-  /** Toggle a sheet panel (like a radio — second tap closes) */
-  function togglePanel(panel: Exclude<Panel, null>) {
-    setActivePanel((prev) => {
-      if (prev === panel) { return null; }
-      setSheetExpanded(false);
-      return panel;
-    });
+  function togglePanel(panel: Exclude<MapPanel, null>) {
+    dispatch(mapUiActions.togglePanel(panel));
   }
 
-  /** FAB: open/close the new-marker form */
   function handleFAB() {
     if (activePanel === "new") {
-      setActivePanel(null);
-      setAddMode(false);
-      setPendingCoords(null);
+      dispatch(mapUiActions.setActivePanel(null));
+      dispatch(mapUiActions.setAddMode(false));
+      dispatch(mapUiActions.setPendingCoords(null));
     } else {
-      setActivePanel("new");
-      setSheetExpanded(false);
-      // don't auto-start addMode — user taps "Выбрать точку" to enter targeting
+      dispatch(mapUiActions.setActivePanel("new"));
+      dispatch(mapUiActions.setSheetExpanded(false));
     }
   }
 
-  /** "Выбрать точку" button in AddPostBox */
   function handleStartAdd() {
-    if (addMode) {
-      setAddMode(false);
-    } else {
-      setAddMode(true);
-      setActivePanel(null); // close sheet so full map is visible
+    if (addMode) dispatch(mapUiActions.setAddMode(false));
+    else {
+      dispatch(mapUiActions.setAddMode(true));
+      dispatch(mapUiActions.setActivePanel(null));
     }
   }
 
   const sheetOpen = activePanel !== null;
   const userInitial = user?.username?.slice(0, 1).toUpperCase() ?? "";
 
-  const handleMapClick = useCallback((coords: [number, number]) => {
-    setPendingCoords(coords);
-    setAddMode(false);
-    setActivePanel("new");
-  }, []);
+  const mapCenter = useMemo<[number, number]>(() => {
+    const hit = cityCatalog.find((c) => c.id === city);
+    if (hit) return [hit.lat, hit.lng];
+    const legacy = CITY_COORDS[city as keyof typeof CITY_COORDS];
+    return legacy ?? CITY_COORDS.shumikha;
+  }, [city, cityCatalog]);
 
-  const handleMarkerClick = useCallback((post: PostRow) => {
-    setSelectedPost(post);
-    setActivePanel("details");
-    setSheetExpanded(false);
-    setAddMode(false);
-  }, []);
+  const mapBounds = useMemo(() => {
+    const hit = cityCatalog.find((c) => c.id === city);
+    if (hit) return getCityMapBounds(hit);
+    const c = CITY_COORDS[city as keyof typeof CITY_COORDS] ?? CITY_COORDS.shumikha;
+    return boundsAroundCenter(c[0], c[1]);
+  }, [city, cityCatalog]);
+
+  const handleMapClick = useCallback(
+    (coords: [number, number]) => {
+      dispatch(mapUiActions.setPendingCoords(coords));
+      dispatch(mapUiActions.setAddMode(false));
+      dispatch(mapUiActions.setActivePanel("new"));
+    },
+    [dispatch]
+  );
+
+  const handleMarkerClick = useCallback(
+    (post: PostRow) => {
+      dispatch(mapUiActions.setSelectedPost(post));
+      dispatch(mapUiActions.setActivePanel("details"));
+      dispatch(mapUiActions.setSheetExpanded(false));
+      dispatch(mapUiActions.setAddMode(false));
+    },
+    [dispatch]
+  );
+
+  const markerSizePx = MARKER_PRESET_PX[markerPreset];
 
   return (
     <main className="relative h-[100dvh] w-full overflow-hidden">
-      {/* ── Full-screen map ─────────────────────────────────────────────── */}
       <YandexMap
         apiKey={yandexApiKey}
         posts={posts}
-        city={city}
-        markerSize={markerSize}
+        mapCenter={mapCenter}
+        mapBounds={mapBounds}
+        markerSize={markerSizePx}
         addMode={addMode}
         onMapClick={handleMapClick}
         onMarkerClick={handleMarkerClick}
       />
       <div className="ui-map-vignette" aria-hidden />
 
-      {/* ── Top status pill ─────────────────────────────────────────────── */}
       <div className="ui-status-bar" aria-live="polite">
         <span className="ui-live-dot" aria-hidden />
         <span
@@ -305,7 +358,6 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
         )}
       </div>
 
-      {/* ── Add-mode hint ───────────────────────────────────────────────── */}
       {addMode && (
         <div className="ui-add-hint" role="status">
           <Crosshair className="h-4 w-4 animate-pulse" aria-hidden />
@@ -313,7 +365,6 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
         </div>
       )}
 
-      {/* ── Sheet backdrop ──────────────────────────────────────────────── */}
       {sheetOpen && (
         <div
           className="fixed inset-0 z-20"
@@ -323,14 +374,12 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
             transition: "opacity 280ms ease",
           }}
           onClick={() => {
-            setActivePanel(null);
-            setAddMode(false);
+            dispatch(mapUiActions.closeSheet());
           }}
           aria-hidden
         />
       )}
 
-      {/* ── Bottom sheet ────────────────────────────────────────────────── */}
       <div
         className="ui-sheet"
         style={{
@@ -341,37 +390,28 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
         aria-modal="true"
         aria-label="Панель"
       >
-        {/* Drag handle */}
         <button
           type="button"
-          onClick={() => setSheetExpanded((v) => !v)}
+          onClick={() => dispatch(mapUiActions.toggleSheetExpanded())}
           className="w-full pt-3 pb-2.5 flex justify-center cursor-pointer focus-visible:outline-none"
           aria-label={sheetExpanded ? "Свернуть панель" : "Развернуть панель"}
         >
           <span className="ui-sheet-handle" />
         </button>
 
-        {/* Content */}
-        <div
-          className="overflow-y-auto flex-1"
-          key={activePanel ?? "empty"}
-          style={{ animation: "section-in 240ms ease-out" }}
-        >
+        <div className="ui-sheet-body overflow-y-auto flex-1" style={{ animation: "section-in 240ms ease-out" }}>
           {activePanel === "new" && (
             <>
-              <SheetHeader
-                title="Новая метка"
-                subtitle="Укажите место, тип и отправьте"
-              />
+              <SheetHeader title="Новая метка" subtitle="Укажите место, тип и отправьте" />
               <AddPostBox
                 addMode={addMode}
                 pendingCoords={pendingCoords}
                 type={newType}
                 comment={newComment}
                 tags={newTags}
-                setType={setNewType}
-                setComment={setNewComment}
-                setTags={setNewTags}
+                setType={(v) => dispatch(mapUiActions.setNewType(v))}
+                setComment={(v) => dispatch(mapUiActions.setNewComment(v))}
+                setTags={(v) => dispatch(mapUiActions.setNewTags(v))}
                 onStartAdd={handleStartAdd}
                 onSubmit={createMarker}
               />
@@ -382,10 +422,11 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
             <>
               <SheetHeader title="Настройки карты" />
               <MapSettingsPanel
+                cities={cityCatalog}
                 city={city}
-                setCity={setCity}
-                markerSize={markerSize}
-                setMarkerSize={setMarkerSize}
+                onCity={(id) => dispatch(mapUiActions.setCity(id))}
+                markerPreset={markerPreset}
+                onPreset={(p) => dispatch(mapUiActions.setMarkerPreset(p))}
               />
             </>
           )}
@@ -395,9 +436,18 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
               <SheetHeader title={user ? "Мой профиль" : "Вход / Регистрация"} />
               <AuthBox
                 user={user}
+                stats={userStats}
+                stripeCheckoutEnabled={stripeCheckoutEnabled}
+                donateUrl={donateUrl}
                 onLogin={(u, p) => auth("login", u, p)}
                 onRegister={(u, p) => auth("register", u, p)}
                 onLogout={logout}
+                onChangePassword={handleChangePassword}
+                onSubscribe={handleSubscribe}
+                onProfileRefresh={async () => {
+                  await dispatch(fetchMe());
+                }}
+                onNotice={(msg) => dispatch(mapUiActions.setNotice(msg))}
               />
             </>
           )}
@@ -405,33 +455,22 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
           {activePanel === "details" && (
             <>
               <SheetHeader title="Детали метки" />
-              <PostDetailsBox
-                post={selectedPost}
-                user={user}
-                onVote={vote}
-                onDelete={deleteCurrentPost}
-              />
+              <PostDetailsBox post={selectedPost} user={user} onVote={vote} onDelete={deleteCurrentPost} />
             </>
           )}
         </div>
       </div>
 
-      {/* ── Floating toast ──────────────────────────────────────────────── */}
       {notice && (
         <div className="ui-toast-float">
           <Toast>{notice}</Toast>
         </div>
       )}
 
-      {/* ── Bottom navigation bar ───────────────────────────────────────── */}
       <nav className="ui-bottom-nav" aria-label="Навигация приложения">
-        {/* Карта — collapses sheet / goes to map */}
         <button
           type="button"
-          onClick={() => {
-            setActivePanel(null);
-            setAddMode(false);
-          }}
+          onClick={() => dispatch(mapUiActions.closeSheet())}
           className={`ui-nav-btn ${activePanel === null && !addMode ? "ui-nav-btn-active" : ""}`}
           aria-label="Карта"
         >
@@ -439,7 +478,6 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
           <span>Карта</span>
         </button>
 
-        {/* FAB — central add button */}
         <div className="relative flex items-center justify-center flex-shrink-0 px-2">
           <button
             type="button"
@@ -459,7 +497,6 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
           </button>
         </div>
 
-        {/* Настройки */}
         <button
           type="button"
           onClick={() => togglePanel("settings")}
@@ -471,7 +508,6 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
           <span>Настройки</span>
         </button>
 
-        {/* Профиль */}
         <button
           type="button"
           onClick={() => togglePanel("profile")}
@@ -480,16 +516,29 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
           aria-pressed={activePanel === "profile"}
         >
           {user ? (
-            <span
-              className="grid h-6 w-6 place-items-center rounded-full text-[10px] font-bold text-white"
-              style={{
-                background: "linear-gradient(135deg, #21182f, #100b18)",
-                outline: activePanel === "profile" ? "2px solid rgba(239, 68, 68, 0.3)" : "none",
-                outlineOffset: "2px",
-              }}
-            >
-              {userInitial}
-            </span>
+            user.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt=""
+                className="h-6 w-6 rounded-full object-cover ring-2 ring-white/90"
+                style={{
+                  objectPosition: "50% 50%",
+                  outline: activePanel === "profile" ? "2px solid rgba(239, 68, 68, 0.3)" : "none",
+                  outlineOffset: "2px",
+                }}
+              />
+            ) : (
+              <span
+                className="grid h-6 w-6 place-items-center rounded-full text-[10px] font-bold text-white"
+                style={{
+                  background: "linear-gradient(135deg, #21182f, #100b18)",
+                  outline: activePanel === "profile" ? "2px solid rgba(239, 68, 68, 0.3)" : "none",
+                  outlineOffset: "2px",
+                }}
+              >
+                {userInitial}
+              </span>
+            )
           ) : (
             <UserIcon className="h-5 w-5" aria-hidden />
           )}
@@ -500,7 +549,6 @@ export function MainMapClient({ yandexApiKey, supabaseUrl, supabaseAnonKey }: Pr
   );
 }
 
-/* ─── Sheet header ─── */
 function SheetHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="px-5 pb-1 pt-0.5">
@@ -510,66 +558,61 @@ function SheetHeader({ title, subtitle }: { title: string; subtitle?: string }) 
       >
         {title}
       </h2>
-      {subtitle && (
-        <p className="ui-soft text-[12px] mt-0.5">{subtitle}</p>
-      )}
+      {subtitle && <p className="ui-soft text-[12px] mt-0.5">{subtitle}</p>}
     </div>
   );
 }
 
-/* ─── Settings panel (city + marker size) ─── */
 function MapSettingsPanel({
+  cities,
   city,
-  setCity,
-  markerSize,
-  setMarkerSize,
+  onCity,
+  markerPreset,
+  onPreset,
 }: {
+  cities: CityEntry[];
   city: string;
-  setCity: (v: string) => void;
-  markerSize: number;
-  setMarkerSize: (v: number) => void;
+  onCity: (id: string) => void;
+  markerPreset: MarkerSizePreset;
+  onPreset: (p: MarkerSizePreset) => void;
 }) {
   return (
     <div className="ui-section">
       <div className="grid gap-1.5">
         <span className="ui-eyebrow">Город</span>
-        <div className="flex flex-wrap gap-1.5">
-          {Object.keys(CITY_LABELS).map((key) => (
-            <Chip key={key} active={city === key} onClick={() => setCity(key)}>
-              {CITY_LABELS[key]}
+        <div className="flex flex-wrap gap-1.5 max-h-[220px] overflow-y-auto pr-0.5">
+          {(cities.length ? cities : [{ id: "shumikha", label: "Шумиха", lat: 55.2255, lng: 63.2982 }]).map((c) => (
+            <Chip key={c.id} active={city === c.id} onClick={() => onCity(c.id)}>
+              {c.label}
             </Chip>
           ))}
         </div>
       </div>
 
       <div className="grid gap-1.5">
-        <span className="ui-eyebrow flex items-center gap-1.5">
-          <ZoomIn className="h-3 w-3" aria-hidden />
-          Размер маркеров
-        </span>
+        <span className="ui-eyebrow">Размер маркеров</span>
         <div
-          className="flex items-center gap-3 rounded-[12px] px-3 py-2.5"
+          className="flex flex-wrap items-center gap-2 rounded-[12px] px-3 py-2.5"
           style={{
             background: "rgba(255, 255, 255, 0.62)",
             border: "1px solid var(--color-border)",
             boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
           }}
         >
-          <input
-            type="range"
-            min={22}
-            max={48}
-            value={markerSize}
-            onChange={(e) => setMarkerSize(Number(e.target.value))}
-            className="flex-1 cursor-pointer accent-[color:var(--color-brand-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-brand-accent)]"
-            aria-label="Размер маркеров"
-          />
-          <span
-            className="ui-mono w-12 text-right text-[12px] font-semibold"
-            style={{ color: "var(--color-brand-deep)" }}
-          >
-            {markerSize}px
-          </span>
+          {(["s", "m", "l"] as const).map((key) => (
+            <Chip
+              key={key}
+              active={markerPreset === key}
+              onClick={() => onPreset(key)}
+              className="min-w-[52px] justify-center font-semibold"
+              aria-label={
+                key === "s" ? "Мелкие маркеры" : key === "m" ? "Средние маркеры" : "Крупные маркеры"
+              }
+            >
+              {key.toUpperCase()}
+            </Chip>
+          ))}
+          <span className="ui-mono ml-auto text-[11px] font-medium opacity-75">{MARKER_PRESET_PX[markerPreset]}px</span>
         </div>
       </div>
     </div>

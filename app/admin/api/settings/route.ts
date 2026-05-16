@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { normalizeCityCatalog } from "@/lib/cities";
 import { getSettings, updateSetting } from "@/server/admin";
 import { routeError } from "@/server/errors";
 
@@ -14,7 +15,11 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const { key, value } = await request.json();
-    await updateSetting(key, value);
+    let next = value;
+    if (key === "city_catalog") {
+      next = normalizeCityCatalog(value);
+    }
+    await updateSetting(key, next);
     return NextResponse.json({ success: true });
   } catch (error) {
     return routeError(error);
